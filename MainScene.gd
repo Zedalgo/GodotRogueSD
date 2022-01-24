@@ -6,42 +6,46 @@ var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 
+var player:Sprite
+
+
 var map_walkable:Array
 
-var buffer_check:bool = false
+
 var map_generated:bool = false
 
-var time:float = 0
-var buffer_time:float = 0.2
-
-func ready():
+# Theoretically runs when the main scene happens for the first time
+func _ready():
 	randomize()
 
+# Handles player inputs
+func _unhandled_input(Input):
+	if Input.is_action_pressed("start_game"):
+		$SpaceToGenMap.visible = false
+		map_generated = true
+		print("generating map...")
+		generate_map()
+		print("map generated")
+	if Input.is_action_pressed("select"):
+		get_clicked_grid_tile()
+#	if Input.is_action_pressed("move_down"):
+#		print("move down")
+#	if Input.is_action_pressed("move_up"):
+#		print("move up")
+#	if Input.is_action_pressed("move_right"):
+#		print("move right")
+#	if Input.is_action_pressed("move_left"):
+#		 player_move(-1, 0) 
 
-func _process(delta):
-	if buffer_check == true:
-		if map_generated == false:
-			if Input.is_action_pressed("start_game"):
-				_generate_map()
-				$SpaceToGenMap.visible = false
-				map_generated = true
-				buffer_check = false
-				time = 0
-		if Input.is_action_pressed("select"):
-			get_clicked_grid_tile()
-			buffer_check = false
-			time = 0
-	
-	if time < buffer_time:
-		time += delta
-	elif buffer_check == false:
-		buffer_check = true
-	else:
-		pass
+
+func player_move(dx, dy):
+	player.x += dx
+	player.y += dy
+	return player
 
 
 # Currently generates a static map
-func _generate_map():
+func generate_map():
 	for i in range(1,32):
 		for j in range(1,16):
 			var _floor = _floor_scene.instance()
@@ -56,9 +60,9 @@ func _generate_map():
 			if (j == 0 || j == 16) || (i == 0 || i == 32):
 				_wall.position = Vector2(x, y)
 				get_parent().add_child(_wall)
-	var _player = _player_scene.instance()
-	_player.position = _new_GetCoord.index_to_vector(3, 3)
-	get_parent().add_child(_player)
+	player = _player_scene.instance()
+	player.position = _new_GetCoord.index_to_vector(3, 3)
+	get_parent().add_child(player)
 
 
 func get_clicked_grid_tile():
