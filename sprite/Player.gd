@@ -8,8 +8,8 @@ var tile_width = 16
 func _unhandled_input(Input):
 	if Input.is_action_pressed("move_down"):
 		try_move(0, 1)
-	if Input.is_action_pressed("move_up"):
-		try_move(0, -1)
+#	if Input.is_action_pressed("move_up"):
+#		try_move(0, -1)
 	if Input.is_action_pressed("move_right"):
 		try_move(1, 0)
 	if Input.is_action_pressed("move_left"):
