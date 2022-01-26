@@ -21,7 +21,7 @@ var tile_height:int = 24
 func _ready():
 	randomize()
 
-# Handles non-movement player inputs
+# Handles player inputs
 func _unhandled_input(Input):
 	if Input.is_action_pressed("start_game") && map_generated == false:
 		$SpaceToGenMap.visible = false
@@ -63,6 +63,11 @@ func generate_map():
 				_floor.position = location
 				get_parent().add_child(_floor)
 				map[i].append(_floor)
+	
+	for i in range(33):
+		for j in range(17):
+			if map[i][j].walkable == false:
+				map[i][j].modulate = Color(1, 0, 0)
 	
 	player = _player_scene.instance()
 	player.position = _new_GetCoord.index_to_vector(3, 3)

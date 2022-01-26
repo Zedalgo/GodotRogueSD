@@ -15,6 +15,39 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
+[node name="ToDo Status Screen" type="Label" parent="."]
+margin_left = 556.0
+margin_top = 73.0
+margin_right = 743.0
+margin_bottom = 87.0
+text = "To Do:
+Status Screen"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="inv and misc todo" type="Label" parent="."]
+margin_left = 559.0
+margin_top = 249.0
+margin_right = 746.0
+margin_bottom = 263.0
+text = "To Do:
+ Inventory & Misc Functions"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="text readout todo" type="Label" parent="."]
+margin_left = 123.0
+margin_top = 466.0
+margin_right = 310.0
+margin_bottom = 480.0
+text = "To Do:
+Text Readout Section"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
 [node name="Line2D" type="Line2D" parent="."]
 points = PoolVector2Array( 533, 410, 0, 410 )
 default_color = Color( 1, 1, 1, 1 )
