@@ -3,12 +3,14 @@ extends Node2D
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
+var _dwarf_scene:PackedScene = preload("res://sprite/Dwarf.tscn")
 
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 
 var player:Sprite
 var wall:Sprite
 
+var entities:Array = []
 var map:Array = []
 
 var map_generated:bool = false
@@ -53,7 +55,6 @@ func generate_map():
 			var x:int = i * 16 + 8
 			var y:int = j * 24 + 12
 			if (j == 0 || j == 16) || (i == 0 || i == 32):
-				
 				_wall.position = Vector2(x, y)
 				get_parent().add_child(_wall)
 				map[i].append(_wall)
@@ -69,9 +70,15 @@ func generate_map():
 			if map[i][j].walkable == false:
 				map[i][j].modulate = Color(1, 0, 0)
 	
+	var dwarf = _dwarf_scene.instance()
+	dwarf.position = _new_GetCoord.index_to_vector(5, 3)
+	get_parent().add_child(dwarf)
+	entities.append(dwarf)
+	
 	player = _player_scene.instance()
 	player.position = _new_GetCoord.index_to_vector(3, 3)
 	get_parent().add_child(player)
+	entities.append(player)
 
 
 func get_clicked_grid_tile():
@@ -88,5 +95,15 @@ func try_move(dx, dy):
 	if map[try_index.x][try_index.y].walkable == false:
 		print("That's a wall")
 	else:
-		player.position.x = try_vec_x
-		player.position.y = try_vec_y
+		var blocking_entity:bool = false
+		for i in range(entities.size()):
+			if entities[i].position == Vector2(try_vec_x, try_vec_y):
+				blocking_entity = true
+		
+		if blocking_entity == true:
+			print("Something's in the way")
+		else:
+			player.position.x = try_vec_x
+			player.position.y = try_vec_y
+		
+		blocking_entity = false
