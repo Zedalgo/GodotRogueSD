@@ -1,6 +1,6 @@
 extends Sprite
 
-
+export var damage:int = 3
+export var entity_name:String = "Dwarf"
 export var health:int = 10
-#export var entity_name:String
 export var walkable:bool = false
