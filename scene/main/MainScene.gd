@@ -1,14 +1,17 @@
 extends Node2D
 
+# Sprite scenes
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 var _dwarf_scene:PackedScene = preload("res://sprite/Dwarf.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 
+# Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var astar = AStar2D.new()
 
+# Don't remember why these are like this
 var player:Sprite
 var wall:Sprite
 
@@ -26,7 +29,10 @@ var tile_height:int = 24
 # I will eventually need to start defining enemy health, damage, etc independent of the sprite node
 # they utilize for visuals. Will likely need to learn how resource scripts work
 
-# Theoretically runs when the main scene happens for the first time
+# Text readout stores forever, will want to limit that eventually
+
+# Theoretically runs when the main scene happens for the first time, many functions won't run on start 
+# if you put them here, might be godot functions only
 func _ready():
 	randomize()
 
@@ -42,7 +48,10 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("select"):
 			get_clicked_grid_tile()
 		if Input.is_action_pressed("debug_key"):
-			print(astar.get_closest_point(player.position))
+			var astar_array:Array = astar.get_point_path(astar.get_closest_point(get_global_mouse_position()), astar.get_closest_point(player.position))
+			print("---")
+			for i in range(astar_array.size()):
+				print(astar_array[i])
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -76,8 +85,17 @@ func generate_map():
 				_floor.position = location
 				get_parent().add_child(_floor)
 				map[i].append(_floor)
-				astar.add_point(k, Vector2(i * tile_width, j * tile_height))
+				astar.add_point(k, _new_GetCoord.index_to_vector(i, j))
+				
 				k += 1
+				if i > 1:
+					var i_node = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j))
+					var i_node_left = astar.get_closest_point(_new_GetCoord.index_to_vector(i - 1, j))
+					astar.connect_points(i_node, i_node_left)
+				if j > 1:
+					var j_node = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j))
+					var j_node_above = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j - 1))
+					astar.connect_points(j_node, j_node_above)
 	
 	player = _player_scene.instance()
 	player.position = _new_GetCoord.index_to_vector(3, 3)
@@ -85,11 +103,9 @@ func generate_map():
 	entities.append(player)
 	
 	for _i in range(2):
-		var dwarf = _dwarf_scene.instance()
-		dwarf.entity_name = "dwarf"
-		dwarf.position = _new_GetCoord.index_to_vector(round(rand_range(1, 31)), round(rand_range(1, 15)))
-		get_parent().add_child(dwarf)
-		entities.append(dwarf)
+		var x:int = round(rand_range(1, 31))
+		var y:int = round(rand_range(1, 15))
+		create_entity(x, y, _dwarf_scene, "dwarf", 10, 3)
 
 
 # Identifies any entities in a grid index tile and prints them to the console
@@ -178,6 +194,23 @@ func enemy_phase():
 				pass
 	create_corpses()
 	player_turn = true
+
+
+func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
+		entity_damage:int, entity_walkable:bool = false, alive:bool = true):
+	var entity = entity_scene.instance()
+	entity.entity_name = entity_name
+	entity.position = _new_GetCoord.index_to_vector(x, y)
+	entity.health = entity_health
+	entity.damage = entity_damage
+	entity.walkable = entity_walkable
+	entity.alive = alive
+	get_parent().add_child(entity)
+	entities.append(entity)
+
+
+func create_item():
+	pass
 
 
 func create_corpses():

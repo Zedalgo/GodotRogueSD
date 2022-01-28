@@ -1,7 +1,7 @@
 extends Sprite
 
-var alive = true
-export var damage:int = 3
-export var entity_name:String = "Dwarf"
-export var health:int = 10
-export var walkable:bool = false
+var alive:bool
+export var damage:int
+export var entity_name:String
+export var health:int
+export var walkable:bool
