@@ -1,10 +1,13 @@
-[gd_scene load_steps=4 format=2]
+[gd_scene load_steps=5 format=2]
 
 [ext_resource path="res://scene/main/MainScene.gd" type="Script" id=1]
 [ext_resource path="res://resource/FiraCode-Regular.ttf" type="DynamicFontData" id=2]
 
 [sub_resource type="DynamicFont" id=1]
 font_data = ExtResource( 2 )
+
+[sub_resource type="StyleBoxFlat" id=2]
+bg_color = Color( 0.780392, 0, 0, 1 )
 
 [node name="MainScene" type="Node2D"]
 script = ExtResource( 1 )
@@ -20,21 +23,20 @@ __meta__ = {
 }
 
 [node name="ToDo Status Screen" type="Label" parent="."]
-margin_left = 556.0
-margin_top = 73.0
-margin_right = 743.0
-margin_bottom = 87.0
-text = "To Do:
-Status Screen"
+margin_left = 625.0
+margin_top = 64.0
+margin_right = 910.0
+margin_bottom = 78.0
+text = "WIP: Status Screen"
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="inv and misc todo" type="Label" parent="."]
-margin_left = 559.0
-margin_top = 249.0
-margin_right = 746.0
-margin_bottom = 263.0
+margin_left = 618.0
+margin_top = 528.0
+margin_right = 805.0
+margin_bottom = 559.0
 text = "To Do:
  Inventory & Misc Functions"
 __meta__ = {
@@ -59,6 +61,49 @@ margin_top = 417.0
 margin_right = 526.0
 margin_bottom = 598.0
 custom_fonts/mono_font = SubResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="StatusScreen" type="RichTextLabel" parent="."]
+margin_left = 540.0
+margin_top = 3.0
+margin_right = 797.0
+margin_bottom = 193.0
+custom_fonts/mono_font = SubResource( 1 )
+text = "HP:"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TurnTracker" type="RichTextLabel" parent="."]
+margin_left = 539.0
+margin_top = 182.0
+margin_right = 819.0
+margin_bottom = 198.0
+custom_fonts/mono_font = SubResource( 1 )
+text = "Turn: 33"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+margin_left = 563.0
+margin_top = 3.0
+margin_right = 583.0
+margin_bottom = 14.0
+custom_styles/fg = SubResource( 2 )
+value = 50.0
+percent_visible = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Inventory" type="RichTextLabel" parent="."]
+margin_left = 540.0
+margin_top = 207.0
+margin_right = 798.0
+margin_bottom = 598.0
 __meta__ = {
 "_edit_use_anchors_": false
 }

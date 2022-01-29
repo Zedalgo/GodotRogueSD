@@ -1,9 +1,8 @@
 extends Node2D
 
-export var health:int = 20
-export var damage:int = 10
-
-export var entity_name:String = "Player"
-
+var health_max:int = 20
+var health_current:int
+var damage:int = 5
+var entity_name:String = "Player"
 var alive = true
 var walkable = false
