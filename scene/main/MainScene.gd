@@ -76,6 +76,7 @@ func _unhandled_input(Input):
 			# Heal back 1 health every ten turns
 			if (player.health_current < player.health_max) && (turn_number % 10 == 0):
 				player.health_current += 1
+			update_inventory_panel()
 			update_status_screen()
 			create_corpses()
 			enemy_phase()
@@ -122,7 +123,8 @@ func generate_map():
 		var x:int = round(rand_range(1, 31))
 		var y:int = round(rand_range(1, 15))
 		create_entity(x, y, _dwarf_scene, "dwarf", 10, 3)
-		
+	
+	update_inventory_panel()
 	update_status_screen()
 
 
@@ -214,6 +216,15 @@ func update_status_screen():
 	$HealthBar.margin_right = $HealthBar.margin_left + (2 * player.health_max)
 	$HealthBar.value = player.health_current
 	$TurnTracker.text = "Turn: %s" % turn_number
+
+
+func update_inventory_panel():
+	$InventoryScreen.text = "Inventory:\n"
+	var empty_slot_number:int = 9 - inventory.size()
+	for i in range(inventory.size()):
+		$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
+	for i in range(empty_slot_number):
+		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
 
 
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,

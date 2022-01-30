@@ -99,7 +99,7 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="Inventory" type="RichTextLabel" parent="."]
+[node name="InventoryScreen" type="RichTextLabel" parent="."]
 margin_left = 540.0
 margin_top = 207.0
 margin_right = 798.0
