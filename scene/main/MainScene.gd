@@ -6,6 +6,8 @@ var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 var _dwarf_scene:PackedScene = preload("res://sprite/Dwarf.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
+var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
+var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var astar = AStar2D.new()
@@ -127,7 +129,7 @@ func generate_map():
 	for _i in range(1):
 		var x:int = round(rand_range(1, 31))
 		var y:int = round(rand_range(1, 15))
-		create_terrain_piece()
+		create_terrain_piece(5, 5, _fountain_scene, "fountain")
 	
 	update_inventory_panel()
 	update_status_screen()
@@ -259,6 +261,15 @@ func create_corpses():
 			items.append(corpse)
 			get_parent().remove_child(entities[i])
 			entities.remove(i)
+
+# Creates terrain pieces like fountains that will replace floor tiles after base map generation
+func create_terrain_piece(x, y, piece_scene:PackedScene, piece_name:String):
+	var terrain_piece = piece_scene.instance()
+	terrain_piece.position = _new_GetCoord.index_to_vector(x, y)
+	get_parent().add_child(terrain_piece)
+	map[x][y] = terrain_piece
+	pass
+
 
 func movement_type(moving_entity):
 	if moving_entity.move_type == "AStar":
