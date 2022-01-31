@@ -22,27 +22,6 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="ToDo Status Screen" type="Label" parent="."]
-margin_left = 625.0
-margin_top = 64.0
-margin_right = 910.0
-margin_bottom = 78.0
-text = "WIP: Status Screen"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="inv and misc todo" type="Label" parent="."]
-margin_left = 618.0
-margin_top = 528.0
-margin_right = 805.0
-margin_bottom = 559.0
-text = "To Do:
- Inventory & Misc Functions"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
 [node name="Line2D" type="Line2D" parent="."]
 points = PoolVector2Array( 533, 410, 0, 410 )
 default_color = Color( 1, 1, 1, 1 )

@@ -118,11 +118,16 @@ func generate_map():
 	create_entity(3, 3, _player_scene, "Player", 20, 5)
 	player = entities[0]
 	player.z_index = 1
-	
-	for _i in range(3):
+
+	for _i in range(1):
 		var x:int = round(rand_range(1, 31))
 		var y:int = round(rand_range(1, 15))
 		create_entity(x, y, _dwarf_scene, "dwarf", 10, 3)
+	
+	for _i in range(1):
+		var x:int = round(rand_range(1, 31))
+		var y:int = round(rand_range(1, 15))
+		create_terrain_piece()
 	
 	update_inventory_panel()
 	update_status_screen()
@@ -201,10 +206,7 @@ func attack(attacker, defender):
 func enemy_phase():
 	for i in range(1, entities.size()): 
 		if entities[i].alive == true:
-			var path_to_player:Array = astar.get_point_path(astar.get_closest_point(entities[i].position), astar.get_closest_point(player.position))
-			var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
-			var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
-			try_move(entities[i], dx, dy)
+			movement_type(entities[i])
 	create_corpses()
 	update_status_screen()
 	player_turn = true
@@ -242,8 +244,9 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entities.append(entity)
 
 
-func create_item():
-	pass
+#func create_item(x, y, item_scene:PackedScene, item_name:String, magical:bool):
+#	
+#	pass
 
 
 func create_corpses():
@@ -256,3 +259,11 @@ func create_corpses():
 			items.append(corpse)
 			get_parent().remove_child(entities[i])
 			entities.remove(i)
+
+func movement_type(moving_entity):
+	if moving_entity.move_type == "AStar":
+		var path_to_player:Array = astar.get_point_path(astar.get_closest_point(moving_entity.position), astar.get_closest_point(player.position))
+		var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
+		var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
+		try_move(moving_entity, dx, dy)
+	pass
