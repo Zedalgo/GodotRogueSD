@@ -8,6 +8,7 @@ var _dwarf_scene:PackedScene = preload("res://sprite/Dwarf.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
+var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var astar = AStar2D.new()
@@ -50,7 +51,7 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("select"):
 			get_clicked_grid_tile()
 		if Input.is_action_pressed("debug_key"):
-			player_turn = false
+			print("debug key")
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -121,15 +122,16 @@ func generate_map():
 	player = entities[0]
 	player.z_index = 1
 
-	for _i in range(1):
-		var x:int = round(rand_range(1, 31))
-		var y:int = round(rand_range(1, 15))
-		create_entity(x, y, _dwarf_scene, "dwarf", 10, 3)
+	for i in range(10):
+		var x:int = i + 1
+		var y:int = 1
+		create_entity(x, y, _dwarf_scene, "dwarf", 0, 3, false, false)
 	
-	for _i in range(1):
-		var x:int = round(rand_range(1, 31))
-		var y:int = round(rand_range(1, 15))
-		create_terrain_piece(5, 5, _fountain_scene, "fountain")
+	create_terrain_piece(5, 5, _fountain_scene, "fountain")
+	
+	create_item(4, 5, _o_scene, "shield")
+	create_item(5, 4, _o_scene, "shield")
+	create_item(2, 2, _o_scene, "shield")
 	
 	update_inventory_panel()
 	update_status_screen()
@@ -246,17 +248,21 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entities.append(entity)
 
 
-#func create_item(x, y, item_scene:PackedScene, item_name:String, magical:bool):
-#	
-#	pass
+func create_item(x, y, item_scene:PackedScene, item_name:String):
+	var item = item_scene.instance()
+	item.position = _new_GetCoord.index_to_vector(x, y)
+	item.item_name = item_name
+	get_parent().add_child(item)
+	items.append(item)
 
 
 func create_corpses():
-	var corpse = _corpse_scene.instance()
 	for i in range(entities.size()-1, -1, -1):
 		if entities[i].alive == false:
+			var corpse = _corpse_scene.instance()
 			corpse.item_name = "%s corpse" % entities[i].entity_name
 			corpse.position = entities[i].position
+			print(_new_GetCoord.vector_to_index(corpse.position.x, corpse.position.y))
 			get_parent().add_child(corpse)
 			items.append(corpse)
 			get_parent().remove_child(entities[i])
