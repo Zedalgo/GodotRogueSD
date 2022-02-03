@@ -1,10 +1,16 @@
 extends Node2D
 
+#variables for mag generation testing
+var whitepixel:PackedScene = preload("res://sprite/WhitePixel.tscn")
+var max_dungeon_height:int = 408
+var max_dungeon_width:int = 528
+var temp_map:Array = []
+
 # Sprite scenes
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
-var _dwarf_scene:PackedScene = preload("res://sprite/Dwarf.tscn")
+var _d_lower_scene:PackedScene = preload("res://sprite/d_lower.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
@@ -12,6 +18,7 @@ var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var astar = AStar2D.new()
+var map_gen_astar = AStar2D.new()
 # Don't remember why these are like this, probably load bearing
 var player:Sprite
 var wall:Sprite
@@ -34,10 +41,8 @@ var turn_number:int = 0
 # Text readout stores forever, will want to limit that eventually
 
 
-# Theoretically runs when the main scene happens for the first time, many functions won't run on start 
-# if you put them here, might be godot functions only
 func _ready():
-	randomize()
+	randomize() # Creates a new seed for randomization
 
 # Handles player inputs
 func _unhandled_input(Input):
@@ -46,12 +51,13 @@ func _unhandled_input(Input):
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
 		generate_map()
+		plot_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
 	if (map_generated == true) && (player_turn == true) && (player.alive == true):
 		if Input.is_action_pressed("select"):
 			get_clicked_grid_tile()
 		if Input.is_action_pressed("debug_key"):
-			print("debug key")
+			pass
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -85,54 +91,39 @@ func _unhandled_input(Input):
 			enemy_phase()
 
 
-# Currently generates a static map
+# Working on a randomly generated map
 func generate_map():
+	# generate a map using only walls and floors
+#	for i in range(33):
+#		map.append([])
+#		for j in range(17):
+#			var _wall = place_terrain(i, j, _wall_scene, "wall", false)
+#			map[i].append(_wall)
+	
+#	for i in range(1, 4):
+#		for j in range(1, 4):
+#			var _floor = replace_terrain(i, j, _floor_scene, "floor", true)
+#			map[i][j] = _floor
+	
 	var k:int = 0
-	for i in range(33):
-		map.append([])
-		for j in range(17):
-			var _wall = _wall_scene.instance()
-			var x:int = i * 16 + 8
-			var y:int = j * 24 + 12
-			if (j == 0 || j == 16) || (i == 0 || i == 32):
-				_wall.position = Vector2(x, y)
-				_wall.z_index = -1
-				get_parent().add_child(_wall)
-				map[i].append(_wall)
-			else:
-				var _floor = _floor_scene.instance()
-				var location:Vector2 = _new_GetCoord.index_to_vector(i, j)
-				_floor.position = location
-				_floor.z_index = -1
-				get_parent().add_child(_floor)
-				map[i].append(_floor)
-				astar.add_point(k, _new_GetCoord.index_to_vector(i, j))
-				
-				k += 1
-				if i > 1:
-					var i_node = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j))
-					var i_node_left = astar.get_closest_point(_new_GetCoord.index_to_vector(i - 1, j))
-					astar.connect_points(i_node, i_node_left)
-				if j > 1:
-					var j_node = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j))
-					var j_node_above = astar.get_closest_point(_new_GetCoord.index_to_vector(i, j - 1))
-					astar.connect_points(j_node, j_node_above)
-	
-	create_entity(3, 3, _player_scene, "Player", 20, 5)
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			map_gen_astar.add_point(k, _new_GetCoord.index_to_vector(i, j))
+			k += 1
+			if i > 0:
+				map_gen_astar.connect_points(map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j)), map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i-1, j)))
+			if j > 0:
+				map_gen_astar.connect_points(map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j)), map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j-1)))
+	# use the walkable floor tiles to generate an astar node array
+	# create terrain features
+	# Create the Player on a random empty room space
+	create_entity(-1, -1, _player_scene, "player", 10, 5)
 	player = entities[0]
-	player.z_index = 1
-
-	for i in range(10):
-		var x:int = i + 1
-		var y:int = 1
-		create_entity(x, y, _dwarf_scene, "dwarf", 0, 3, false, false)
 	
-	create_terrain_piece(5, 5, _fountain_scene, "fountain")
+	# generate enemies on the map
+	# generate items on the map
 	
-	create_item(4, 5, _o_scene, "shield")
-	create_item(5, 4, _o_scene, "shield")
-	create_item(2, 2, _o_scene, "shield")
-	
+	# Initial appearance of the info panels 
 	update_inventory_panel()
 	update_status_screen()
 
@@ -233,8 +224,27 @@ func update_inventory_panel():
 		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
 
 
+func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool):
+	var terrain = terrain_scene.instance()
+	terrain.position = _new_GetCoord.index_to_vector(x, y)
+	terrain.terrain_name = terrain_name
+	terrain.walkable = walkable
+	get_parent().add_child(terrain)
+	return terrain
+
+
+func replace_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool):
+	var terrain = terrain_scene.instance()
+	terrain.position = _new_GetCoord.index_to_vector(x, y)
+	terrain.terrain_name = terrain_name
+	terrain.walkable = walkable
+	get_parent().add_child(terrain)
+	get_parent().remove_child(map[x][y])
+	return terrain
+
+
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
-		entity_damage:int, entity_walkable:bool = false, alive:bool = true):
+		entity_damage:int, entity_walkable:bool = false, alive:bool = true ):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
@@ -269,12 +279,13 @@ func create_corpses():
 			entities.remove(i)
 
 # Creates terrain pieces like fountains that will replace floor tiles after base map generation
-func create_terrain_piece(x, y, piece_scene:PackedScene, piece_name:String):
-	var terrain_piece = piece_scene.instance()
-	terrain_piece.position = _new_GetCoord.index_to_vector(x, y)
-	get_parent().add_child(terrain_piece)
-	map[x][y] = terrain_piece
-	pass
+func create_room_object(x, y, object_scene:PackedScene, object_name:String):
+	var room_object = object_scene.instance()
+	room_object.position = _new_GetCoord.index_to_vector(x, y)
+	room_object.room_object_name = object_name
+	get_parent().add_child(room_object)
+	map[x][y] = room_object
+	# if not walkable remove astar node, ya dingus
 
 
 func movement_type(moving_entity):
@@ -283,4 +294,37 @@ func movement_type(moving_entity):
 		var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
 		var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
 		try_move(moving_entity, dx, dy)
+	pass
+
+
+func plot_map():
+	var rooms:Array = []
+	var walls_to_try:Array = []
+	var firstroom_width:int = rand_range(5,9)
+	var firstroom_height:int = rand_range(5, 9)
+	var firstroom:Array
+	
+	for i in range(firstroom_width):
+		for j in range(firstroom_height):
+			var wpxl = whitepixel.instance()
+			wpxl.position = Vector2(i + max_dungeon_width / 2, j + max_dungeon_height / 2)
+			if i == 0 || i == firstroom_width - 1:
+				wpxl.modulate = Color(1, 0, 0)
+			else:
+				wpxl.modulate = Color(0, 1, 0)
+			if j == 0 || j == firstroom_height - 1:
+				if wpxl.modulate == Color(1, 0, 0):
+					wpxl.modulate = Color(0, 0, 1)
+				else:
+					wpxl.modulate = Color(1, 0, 0)
+			get_parent().add_child(wpxl)
+			firstroom.append(wpxl)
+	# generate a second room relative to the first
+	for i in range(firstroom.size()):
+		
+		pass
+	
+#	while rooms.size() < 10:
+#
+	
 	pass
