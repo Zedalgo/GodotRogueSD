@@ -55,6 +55,7 @@ func _unhandled_input(Input):
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
 	if (map_generated == true) && (player_turn == true) && (player.alive == true):
 		if Input.is_action_pressed("select"):
+			print(get_global_mouse_position())
 			get_clicked_grid_tile()
 		if Input.is_action_pressed("debug_key"):
 			pass
@@ -128,7 +129,7 @@ func generate_map():
 	update_status_screen()
 
 
-# Identifies any entities in a grid index tile and prints them to the console
+# Identifies any entities in a grid index tile and brints them to the console
 # Creatures use .entity_name instead of .name because godot won't let two nodes share a .name
 func get_clicked_grid_tile():
 	var click_loc = get_global_mouse_position()
@@ -272,7 +273,7 @@ func create_corpses():
 			var corpse = _corpse_scene.instance()
 			corpse.item_name = "%s corpse" % entities[i].entity_name
 			corpse.position = entities[i].position
-			print(_new_GetCoord.vector_to_index(corpse.position.x, corpse.position.y))
+			#p rint(_new_GetCoord.vector_to_index(corpse.position.x, corpse.position.y))
 			get_parent().add_child(corpse)
 			items.append(corpse)
 			get_parent().remove_child(entities[i])
@@ -300,9 +301,13 @@ func movement_type(moving_entity):
 func plot_map():
 	var rooms:Array = []
 	var walls_to_try:Array = []
-	var firstroom_width:int = rand_range(5,9)
-	var firstroom_height:int = rand_range(5, 9)
+	var firstroom_width:int = 9
+	var firstroom_height:int = 9 #change back when fixed
 	var firstroom:Array
+	var top_left:Vector2 = Vector2(max_dungeon_width / 2, max_dungeon_height / 2)
+	var bot_right:Vector2 = Vector2(max_dungeon_width/2 + firstroom_width-1, max_dungeon_height/2 + firstroom_height-1)
+	firstroom.append(top_left)
+	firstroom.append(bot_right)
 	
 	for i in range(firstroom_width):
 		for j in range(firstroom_height):
@@ -310,21 +315,111 @@ func plot_map():
 			wpxl.position = Vector2(i + max_dungeon_width / 2, j + max_dungeon_height / 2)
 			if i == 0 || i == firstroom_width - 1:
 				wpxl.modulate = Color(1, 0, 0)
+				walls_to_try.append(wpxl)
 			else:
 				wpxl.modulate = Color(0, 1, 0)
 			if j == 0 || j == firstroom_height - 1:
-				if wpxl.modulate == Color(1, 0, 0):
+				if i == 0 || i == firstroom_width - 1:
 					wpxl.modulate = Color(0, 0, 1)
 				else:
 					wpxl.modulate = Color(1, 0, 0)
+					walls_to_try.append(wpxl)
 			get_parent().add_child(wpxl)
 			firstroom.append(wpxl)
-	# generate a second room relative to the first
-	for i in range(firstroom.size()):
+	rooms.append(firstroom)
+	# generate another room(s) relative to the first
+	# change range to walls to try after 2nd room confirm
+	for i in range(9):
+		var room_width:int = 4
+		var room_height:int = 5
+		var x_dir:int = 1
+		var y_dir:int = 1
 		
-		pass
+		print("Attempting room at root:", walls_to_try[i].position)
+		
+		for direction in range(0, 4):
+			var room_valid:bool = true
+			if direction == 1:
+				x_dir = -1
+				y_dir = 1
+			elif direction == 2:
+				x_dir = -1
+				y_dir = -1
+			elif direction == 3:
+				x_dir = 1
+				y_dir = -1
+			elif direction == 0:
+				x_dir = 1
+				y_dir = 1
+
+			var topleft:Vector2
+			var botright:Vector2
+			#topleft
+			if direction == 0:
+				topleft = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y)
+				botright = Vector2(walls_to_try[i].position.x + room_width - 1, walls_to_try[i].position.y + room_height - 1)
+			elif direction == 1:
+				topleft = Vector2(walls_to_try[i].position.x - room_width + 1, walls_to_try[i].position.y)
+				botright = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y + room_height - 1)
+			elif direction == 2:
+				topleft = Vector2(walls_to_try[i].position.x - room_width + 1, walls_to_try[i].position.y - room_height + 1)
+				botright = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y)
+			elif direction == 3:
+				topleft = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y - room_height + 1)
+				botright = Vector2(walls_to_try[i].position.x + room_width - 1, walls_to_try[i].position.y)
+
+			print(direction, topleft, botright)
+
+			for j in range(rooms.size()):
+				var start_point = walls_to_try[i].position
+				var tl_corner = rooms[j][0]
+				var br_corner = rooms[j][1]
+				for a in range(room_width - 1):
+					for b in range(room_height - 1):
+						if ((start_point.x + (x_dir*a) > tl_corner.x) && (start_point.x + (x_dir*a) < br_corner.x)) && ((start_point.y + (x_dir*b) > tl_corner.y) && (start_point.y + (x_dir*b) < br_corner.y)):
+							room_valid = false
+
+			# If a suitable location is found, then generate the room
+			if room_valid == true:
+				var room:Array = []
+#				var topleft:Vector2
+#				var botright:Vector2
+#				#topleft
+#				if direction == 0:
+#					topleft = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y)
+#					botright = Vector2(walls_to_try[i].position.x + room_width - 1, walls_to_try[i].position.y + room_height - 1)
+#				elif direction == 1:
+#					topleft = Vector2(walls_to_try[i].position.x - room_width + 1, walls_to_try[i].position.y)
+#					botright = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y + room_height - 1)
+#				elif direction == 2:
+#					topleft = Vector2(walls_to_try[i].position.x - room_width + 1, walls_to_try[i].position.y - room_height + 1)
+#					botright = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y)
+#				elif direction == 3:
+#					topleft = Vector2(walls_to_try[i].position.x, walls_to_try[i].position.y - room_height + 1)
+#					botright = Vector2(walls_to_try[i].position.x + room_width - 1, walls_to_try[i].position.y)
+				room.append(topleft)
+				room.append(botright)
+				for a in range(room_width):
+					for b in range(room_height):
+						var wpxl = whitepixel.instance()
+						wpxl.position = Vector2(walls_to_try[i].position.x + x_dir*a, walls_to_try[i].position.y + y_dir*b)
+						if a == 0 || a == room_width - 1:
+							wpxl.modulate = Color(1, 0, 0)
+						else:
+							wpxl.modulate = Color(0, 1, 0)
+						if b == 0 || b == room_height - 1:
+							if a == 0 || a == room_width - 1:
+								wpxl.modulate = Color(0, 0, 1)
+							else:
+								wpxl.modulate = Color(1, 0, 0)
+						room.append(wpxl)
+						get_parent().add_child(wpxl)
+				rooms.append(room)
+				print("Room created at: (", topleft, ")(", botright, ")")
+				# Sets the bool false for the next attempt at generation
+				break
+			
+	#Turn Checked Walls white or black (whichever is more readable)
 	
-#	while rooms.size() < 10:
-#
-	
-	pass
+	# Turn the second iteration into a loop
+	# Generate a map!
