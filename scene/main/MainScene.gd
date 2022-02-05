@@ -90,33 +90,37 @@ func _unhandled_input(Input):
 			enemy_phase()
 
 
-# Working on a randomly generated map
 func generate_map():
-	# generate a map using only walls and floors
-#	for i in range(33):
-#		map.append([])
-#		for j in range(17):
-#			var _wall = place_terrain(i, j, _wall_scene, "wall", false)
-#			map[i].append(_wall)
+	#Fill space with walls, populate the map array
+	for i in range(3):
+		map.append([])
+		for j in range(3):
+			var _wall = place_terrain(i, j, _wall_scene, "wall", false)
+			map[i].append(_wall)
+		
+	# Room Generation
+	var room_list:Array = []
+	var room_number:int = randi() % 3 + 4
+	var growth_ticks:int = randi() % 2 * room_number
+	##32 zones on a 4x8 grid, 4-6 zones growing 3 times leads to 16-24 occupied zones
+	for i in range(room_number):
+		var macro_x = randi() % 4
+		var macro_y = randi() % 4
+		# do this later in the function -> var room_coords:Array = [macro_x, macro_y]
+		#set first room on the grid
+		#for subsequent rooms, check for overlap
+		#handle expanding rooms
+		#once this works, expend to generate actual spaces on the map with replace()
+		#union expansions of rooms to the greater room
+		#hallways
+		
+		pass
 	
-#	for i in range(1, 4):
-#		for j in range(1, 4):
-#			var _floor = replace_terrain(i, j, _floor_scene, "floor", true)
-#			map[i][j] = _floor
-	
-	var k:int = 0
-	for i in range(map.size()):
-		for j in range(map[i].size()):
-			map_gen_astar.add_point(k, _new_GetCoord.index_to_vector(i, j))
-			k += 1
-			if i > 0:
-				map_gen_astar.connect_points(map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j)), map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i-1, j)))
-			if j > 0:
-				map_gen_astar.connect_points(map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j)), map_gen_astar.get_closest_point(_new_GetCoord.index_to_vector(i, j-1)))
-	# use the walkable floor tiles to generate an astar node array
+	# Connect astar nodes
+			
 	# create terrain features
 	# Create the Player on a random empty room space
-	create_entity(-1, -1, _player_scene, "player", 10, 5)
+	create_entity(-1, -1, _player_scene, "player", 10, 5, 10)
 	player = entities[0]
 	
 	# generate enemies on the map
@@ -208,10 +212,13 @@ func enemy_phase():
 
 func update_status_screen():
 	$HealthBar.max_value = player.health_max
-	#If max health exceeds 115, the bar will go offscreen, may need to clamp if health can get higher
-	$HealthBar.margin_right = $HealthBar.margin_left + (2 * player.health_max)
 	$HealthBar.value = player.health_current
+	$EnergyBar.max_value = player.energy_max
+	$EnergyBar.value = player.energy_current
 	$TurnTracker.text = "Turn: %s" % turn_number
+	var health_percent = round(100 * (player.health_current / player.health_max))
+	var energy_percent = round(100 * (player.energy_current / player.energy_max))
+	$StatusScreen.text = "%s%s\n%s%s" % [health_percent, "%", energy_percent, "%"]
 
 
 func update_inventory_panel():
@@ -243,12 +250,14 @@ func replace_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walka
 
 
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
-		entity_damage:int, entity_walkable:bool = false, alive:bool = true ):
+		entity_damage:int, entity_energy_max:int = 0,  entity_walkable:bool = false, alive:bool = true ):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
 	entity.health_max = entity_health
 	entity.health_current = entity.health_max
+	entity.energy_max = entity_energy_max
+	entity.energy_current = entity.energy_max
 	entity.damage = entity_damage
 	entity.walkable = entity_walkable
 	entity.alive = alive

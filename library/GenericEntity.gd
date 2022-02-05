@@ -1,6 +1,8 @@
 extends Node
 
 var alive:bool
+var energy_current:int
+var energy_max:int = 10
 var entity_name:String
 var health_current:int
 var health_max:int

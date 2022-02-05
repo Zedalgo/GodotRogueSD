@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=2]
+[gd_scene load_steps=6 format=2]
 
 [ext_resource path="res://scene/main/MainScene.gd" type="Script" id=1]
 [ext_resource path="res://resource/FiraCode-Regular.ttf" type="DynamicFontData" id=2]
@@ -8,6 +8,9 @@ font_data = ExtResource( 2 )
 
 [sub_resource type="StyleBoxFlat" id=2]
 bg_color = Color( 0.780392, 0, 0, 1 )
+
+[sub_resource type="StyleBoxFlat" id=3]
+bg_color = Color( 0, 0.516272, 0.65918, 1 )
 
 [node name="MainScene" type="Node2D"]
 script = ExtResource( 1 )
@@ -45,20 +48,21 @@ __meta__ = {
 }
 
 [node name="StatusScreen" type="RichTextLabel" parent="."]
-margin_left = 540.0
+margin_left = 750.0
 margin_top = 3.0
 margin_right = 797.0
 margin_bottom = 193.0
 custom_fonts/mono_font = SubResource( 1 )
-text = "HP:"
+text = "HP
+Energy"
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="TurnTracker" type="RichTextLabel" parent="."]
-margin_left = 539.0
+margin_left = 572.0
 margin_top = 182.0
-margin_right = 819.0
+margin_right = 797.0
 margin_bottom = 198.0
 custom_fonts/mono_font = SubResource( 1 )
 text = "Turn: 33"
@@ -67,11 +71,25 @@ __meta__ = {
 }
 
 [node name="HealthBar" type="ProgressBar" parent="."]
-margin_left = 563.0
+margin_left = 540.0
 margin_top = 3.0
-margin_right = 583.0
+margin_right = 745.0
 margin_bottom = 14.0
+rect_pivot_offset = Vector2( 67, 11 )
 custom_styles/fg = SubResource( 2 )
+value = 50.0
+percent_visible = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="EnergyBar" type="ProgressBar" parent="."]
+margin_left = 540.0
+margin_top = 19.0
+margin_right = 745.0
+margin_bottom = 30.0
+rect_pivot_offset = Vector2( 67, 11 )
+custom_styles/fg = SubResource( 3 )
 value = 50.0
 percent_visible = false
 __meta__ = {
@@ -86,8 +104,3 @@ margin_bottom = 598.0
 __meta__ = {
 "_edit_use_anchors_": false
 }
-
-[node name="Camera2D" type="Camera2D" parent="."]
-offset = Vector2( 260, 200 )
-current = true
-zoom = Vector2( 0.1, 0.1 )
