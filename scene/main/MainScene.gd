@@ -28,6 +28,7 @@ var entities:Array = []
 var inventory:Array = []
 var items:Array = []
 var map:Array = []
+var room_list:Array = []
 # Booleans
 var map_generated:bool = false
 var player_turn:bool = true
@@ -54,6 +55,8 @@ func _unhandled_input(Input):
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
+		create_entity(-1, -1, _player_scene, "player", 10, 5, 10)
+		player = entities[0]
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
 	if (map_generated == true) && (player_turn == true) && (player.alive == true):
@@ -103,13 +106,12 @@ func generate_map():
 			map[i].append(_wall)
 		
 	# Room Generation
-	var room_list:Array = []
-	var number_of_rooms:int = randi() % 3 + 4
-	var growth_ticks:int = rand_range(3, 4) * number_of_rooms
-	print("Number of Rooms:", number_of_rooms)
-	##32 zones on a 8x4 grid, 4-6 zones growing 3 times leads to 16-24 occupied zones
+	room_list = []
+	var number_of_rooms:int = randi() % 2 + 6
+	var growth_ticks:int = 3 * number_of_rooms
+	var hallway_nodes:int = rand_range(4, 11 - number_of_rooms)
 	
-	# ?!? Bug in initial generation: Overlapping rooms might still occur
+	# ?!? Bug in initial generation: Overlapping rooms might still occur - think it's fixed now 2/7/22
 	for i in range(number_of_rooms):
 		var macro_x:int = rand_range(0, 8)
 		var macro_y:int = rand_range(0, 4)
@@ -121,18 +123,19 @@ func generate_map():
 		room_coords = [macro_x, macro_y, room_number]
 		var overlap:bool = false
 		for j in range(room_list.size()):
-			if room_list[j] == room_coords:
+			if room_list[j][0] == room_coords[0] && room_list[j][1] == room_coords[1]:
 				overlap = true
 		
+		var not_overlapping:bool = false
 		while overlap == true:
 			macro_x = rand_range(0, 7)
 			macro_y = rand_range(0, 3)
-			var not_overlapping:bool = false
+			not_overlapping = false
 			room_coords = [macro_x, macro_y, room_number]
 			for j in range(room_list.size()):
 				if room_list[j] == room_coords:
 					break
-				if j == room_list.size() - 1:
+				if j == room_list.size()-1:
 					not_overlapping = true
 			if not_overlapping == true:
 				overlap = false
@@ -140,13 +143,40 @@ func generate_map():
 		room_list.append(room_coords)
 		replace_index_x = (macro_x * 4) + 2
 		replace_index_y = (macro_y * 4) + 2
-		print("Generating room ", room_number, " at index ", replace_index_x, ", ", replace_index_y, "[", macro_x, "][", macro_y, "]")
 		for a in range(replace_index_x - 1, replace_index_x + 2):
 			for b in range(replace_index_y - 1, replace_index_y + 2):
 				replace_terrain(a, b, _floor_scene, "floor", true)
 	
+	#Create Hallways between rooms, ensuring there's a route to every one without being spaghetti
+	for i in range(room_list.size()):
+		var root_x:int = (4 * room_list[i][0]) + 2
+		var root_y:int = (4 * room_list[i][1]) + 2
+		var target_x:int = (4 * room_list[i - 1][0]) + 2
+		var target_y:int = (4 * room_list[i - 1][1]) + 2
+		var first_direction:int = randi() % 2 # Determines if vertical or horizontal first hallway shape
+		var x_inc_dec:int = 1
+		var y_inc_dec:int = 1
+		
+		if target_x < root_x:
+			x_inc_dec = -1
+		if target_y < root_y:
+			y_inc_dec = -1
+		
+		if first_direction == 0: # Horizontal First
+			for a in range(root_x, target_x, x_inc_dec):
+				replace_terrain(a, root_y, _floor_scene, "floor", true)
+			for b in range(root_y, target_y, y_inc_dec):
+				replace_terrain(target_x, b, _floor_scene, "floor", true)
+			
+		if first_direction == 1: # Vertical First
+			for b in range(root_y, target_y, y_inc_dec):
+				replace_terrain(root_x, b, _floor_scene, "floor", true)
+			for a in range(root_x, target_x, x_inc_dec):
+				replace_terrain(a, target_y, _floor_scene, "floor", true)
+		
 	#Expands the initial rooms in a similar way to initial gen, just tethered to the room selected for growth
-	for i in range(growth_ticks):
+	var growth_var:int = 0
+	while growth_var < growth_ticks:
 		var room_selector:int = rand_range(0, room_list.size() - 1)
 		var room_to_grow_from:Array = room_list[room_selector]
 		var direction:int = rand_range(0, 4)
@@ -167,8 +197,7 @@ func generate_map():
 		if direction== 3:# Upward
 			macro_y -= 1
 		
-		var overlap:bool
-		overlap = false
+		var overlap:bool = false
 		
 		if macro_x < 0 || macro_y < 0:
 			overlap == true
@@ -182,7 +211,6 @@ func generate_map():
 			replace_index_x = (macro_x * 4) + 2
 			replace_index_y = (macro_y * 4) + 2
 			if direction == 0 && macro_x < 7:
-				print("Expanding room ", room_to_grow_from[2], " in direction ", direction, "[", macro_x, "][", macro_y, "]")
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
 				for a in range(replace_index_x - 2, replace_index_x + 2):
@@ -191,31 +219,60 @@ func generate_map():
 			if direction == 1 && macro_x > 0:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
-				print("Expanding room ", room_to_grow_from[2], " in direction ", direction, "[", macro_x, "][", macro_y, "]")
 				for a in range(replace_index_x - 1, replace_index_x + 3):
 					for b in range(replace_index_y - 1, replace_index_y + 2):
 						replace_terrain(a, b, _floor_scene, "floor", true)
 			if direction == 2 && macro_y < 3:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
-				print("Expanding room ", room_to_grow_from[2], " in direction ", direction, "[", macro_x, "][", macro_y, "]")
 				for a in range(replace_index_x - 1, replace_index_x + 2):
 					for b in range(replace_index_y - 2, replace_index_y + 2):
 						replace_terrain(a, b, _floor_scene, "floor", true)
 			if direction == 3 && macro_y > 0:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
-				print("Expanding room ", room_to_grow_from[2], " in direction ", direction, "[", macro_x, "][", macro_y, "]")
 				for a in range(replace_index_x - 1, replace_index_x + 2):
 					for b in range(replace_index_y - 1, replace_index_y + 3):
 						replace_terrain(a, b, _floor_scene, "floor", true)
-	#breakpoint
+			growth_var += 1
+	
+	for i in range(room_list.size()):
+		var room_map_x:int = (4*room_list[i][0]) + 2
+		var room_map_y:int = (4*room_list[i][1]) + 2
+		var room_number:int = room_list[i][2]
+		var same_room:bool = false
+		if room_list[i][0] < 7:# Check Right wall
+			if map[room_map_x + 2][room_map_y].terrain_name == "floor":
+				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall":
+					map[room_map_x + 2][room_map_y].modulate = Color(1, 0, 0)
+		if room_list[i][0] > 0:# Check Left Wall
+			if map[room_map_x - 2][room_map_y].terrain_name == "floor":
+				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall":
+					map[room_map_x - 2][room_map_y].modulate = Color(1, 0, 0)
+		if room_list[i][1] < 3:# Check Bottom Wall
+			if map[room_map_x][room_map_y + 2].terrain_name == "floor":
+				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall":
+					map[room_map_x][room_map_y + 2].modulate = Color(1, 0, 0)
+		if room_list[i][1] > 0:#Check top Wall
+			if map[room_map_x][room_map_y - 2].terrain_name == "floor":
+				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall":
+					map[room_map_x][room_map_y - 2].modulate = Color(1, 0, 0)
+	
+	# Put doors on hallways by checking rooms to see if there's a hallway tile in place of a wall
+	# Use a check if either side(x+-1) is a floor, but the other sides(y+-1) aren't also floor
+	# Also want to check if it's the same room
+	
 		# Done - set first room on the grid
 		# Done - for subsequent rooms, check for overlap
 		# Done - handle expanding rooms
 		# Done - once this works, expand to generate actual spaces on the map with replace()
 		# Done - via room_number, which is room_coords[2] - union expansions of rooms to the greater room
-		#hallways
+		# Done - hallways
+		# doors, detection done, need door entity
+		# random player start
+		# enemies
+		# items
+		# fountains
 		
 	# Place Astar nodes on floor tiles
 	# Connect astar nodes
@@ -223,15 +280,14 @@ func generate_map():
 			
 	# create terrain features
 	# Create the Player on a random empty room space
-	create_entity(-1, -1, _player_scene, "player", 10, 5, 10)
-	player = entities[0]
+	var spawn_room:int = randi() % room_list.size()
+	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
 	
 	# generate enemies on the map
 	# generate items on the map
 	
 	
 	# Initial appearance of the info panels 
-	
 	update_inventory_panel()
 	update_status_screen()
 
@@ -344,14 +400,14 @@ func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkabl
 	return terrain
 
 
-func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:String, walkable:bool):
+func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:String, walkable:bool) -> void:
 	var terrain = terrain_scene.instance()
 	terrain.position = _new_GetCoord.index_to_vector(index_x, index_y)
 	terrain.terrain_name = terrain_name
 	terrain.walkable = walkable
 	get_parent().add_child(terrain)
 	get_parent().remove_child(map[index_x][index_y])
-	return terrain
+	map[index_x][index_y] = terrain
 
 
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
