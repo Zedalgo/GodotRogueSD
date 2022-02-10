@@ -1,16 +1,12 @@
 extends Node2D
 
-#variables for mag generation testing
-var whitepixel:PackedScene = preload("res://sprite/WhitePixel.tscn")
-var max_dungeon_height:int = 408
-var max_dungeon_width:int = 528
-var temp_map:Array = []
 
 # Sprite scenes
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 var _d_lower_scene:PackedScene = preload("res://sprite/d_lower.tscn")
+var _door_scene:PackedScene = preload("res://sprite/Door.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
@@ -28,6 +24,7 @@ var entities:Array = []
 var inventory:Array = []
 var items:Array = []
 var map:Array = []
+var objects:Array = []
 var room_list:Array = []
 # Booleans
 var map_generated:bool = false
@@ -55,7 +52,7 @@ func _unhandled_input(Input):
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
-		create_entity(-1, -1, _player_scene, "player", 10, 5, 10)
+		create_entity(-1, -1, _player_scene, "player", 10, 5, 10, "Player")
 		player = entities[0]
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
@@ -63,7 +60,7 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("select"):
 			print("Mouse at:", get_global_mouse_position())
 		if Input.is_action_pressed("debug_key"):
-			pass
+			print(astar.get_closest_point(player.position))
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -91,8 +88,10 @@ func _unhandled_input(Input):
 			# Heal back 1 health every ten turns
 			if (player.health_current < player.health_max) && (turn_number % 10 == 0):
 				player.health_current += 1
+			trim_text_readout()
 			update_inventory_panel()
 			update_status_screen()
+			update_floor_tiles()
 			create_corpses()
 			enemy_phase()
 
@@ -109,9 +108,7 @@ func generate_map():
 	room_list = []
 	var number_of_rooms:int = randi() % 2 + 6
 	var growth_ticks:int = 3 * number_of_rooms
-	var hallway_nodes:int = rand_range(4, 11 - number_of_rooms)
 	
-	# ?!? Bug in initial generation: Overlapping rooms might still occur - think it's fixed now 2/7/22
 	for i in range(number_of_rooms):
 		var macro_x:int = rand_range(0, 8)
 		var macro_y:int = rand_range(0, 4)
@@ -207,7 +204,7 @@ func generate_map():
 				overlap = true
 		
 		if overlap == false:
-			#change depeding on growth direction
+			#rectangle of floor changes depeding on growth direction
 			replace_index_x = (macro_x * 4) + 2
 			replace_index_y = (macro_y * 4) + 2
 			if direction == 0 && macro_x < 7:
@@ -236,6 +233,19 @@ func generate_map():
 						replace_terrain(a, b, _floor_scene, "floor", true)
 			growth_var += 1
 	
+	# Generates the astar array and connects the points of the grid
+	var k:int = 0
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			if map[i][j].walkable == true:
+				astar.add_point(k, map[i][j].position)
+				print("Creating Node at:", map[i][j].position)
+				k += 1
+			if map[i-1][j].position == astar.get_point_position(astar.get_closest_point(map[i-1][j].position)):
+				astar.connect_points(astar.get_closest_point(map[i-1][j].position), astar.get_closest_point(map[i][j].position))
+			if map[i][j-1].position == astar.get_point_position(astar.get_closest_point(map[i][j-1].position)):
+				astar.connect_points(astar.get_closest_point(map[i][j-1].position), astar.get_closest_point(map[i][j].position))
+	# Detects where doors should be placed and turns the tile red 
 	for i in range(room_list.size()):
 		var room_map_x:int = (4*room_list[i][0]) + 2
 		var room_map_y:int = (4*room_list[i][1]) + 2
@@ -244,19 +254,20 @@ func generate_map():
 		if room_list[i][0] < 7:# Check Right wall
 			if map[room_map_x + 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall":
-					map[room_map_x + 2][room_map_y].modulate = Color(1, 0, 0)
+					create_room_object(room_map_x + 2, room_map_y, _door_scene, "door")
 		if room_list[i][0] > 0:# Check Left Wall
 			if map[room_map_x - 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall":
-					map[room_map_x - 2][room_map_y].modulate = Color(1, 0, 0)
+					create_room_object(room_map_x - 2, room_map_y, _door_scene, "door")
 		if room_list[i][1] < 3:# Check Bottom Wall
 			if map[room_map_x][room_map_y + 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall":
-					map[room_map_x][room_map_y + 2].modulate = Color(1, 0, 0)
+					create_room_object(room_map_x, room_map_y + 2, _door_scene, "door")
 		if room_list[i][1] > 0:#Check top Wall
 			if map[room_map_x][room_map_y - 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall":
-					map[room_map_x][room_map_y - 2].modulate = Color(1, 0, 0)
+					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door")
+	
 	
 	# Put doors on hallways by checking rooms to see if there's a hallway tile in place of a wall
 	# Use a check if either side(x+-1) is a floor, but the other sides(y+-1) aren't also floor
@@ -268,11 +279,11 @@ func generate_map():
 		# Done - once this works, expand to generate actual spaces on the map with replace()
 		# Done - via room_number, which is room_coords[2] - union expansions of rooms to the greater room
 		# Done - hallways
-		# doors, detection done, need door entity
-		# random player start
+		# Done - doors, detection done, door entity done, astar disabling done, astar enabling wip
+		# Done - random player start
 		# enemies
 		# items
-		# fountains
+		# recharge station - energy
 		
 	# Place Astar nodes on floor tiles
 	# Connect astar nodes
@@ -282,6 +293,9 @@ func generate_map():
 	# Create the Player on a random empty room space
 	var spawn_room:int = randi() % room_list.size()
 	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
+	for i in range(3):
+		var enemy_spawn:int = randi() % room_list.size()
+		create_entity(4 * room_list[enemy_spawn][0] + 2, 4 * room_list[enemy_spawn][1] + 2, _d_lower_scene, "dwarf", 10, 1, 3, "AStar")
 	
 	# generate enemies on the map
 	# generate items on the map
@@ -290,6 +304,8 @@ func generate_map():
 	# Initial appearance of the info panels 
 	update_inventory_panel()
 	update_status_screen()
+	trim_text_readout()
+	update_floor_tiles()
 
 
 # Identifies any entities in a grid index tile and brints them to the console
@@ -332,6 +348,10 @@ func try_move(entity, dx, dy):
 	var try_vec_y = entity.position.y + (dy * tile_height)
 	var try_index:Vector2 = _new_GetCoord.vector_to_index(try_vec_x, try_vec_y)
 	if map[try_index.x][try_index.y].walkable == false:
+		for i in range(objects.size()):
+			if objects[i].position == Vector2(try_vec_x, try_vec_y):
+				var blocking_object = objects[i]
+				try_object(blocking_object)
 		pass
 	else:
 		var entity_is_blocking:bool = false
@@ -352,6 +372,14 @@ func try_move(entity, dx, dy):
 		entity_is_blocking = false
 
 
+func try_object(object):
+	if object.room_object_name == "door":
+		object.modulate = Color(0.5, 0.5, 0.5)
+		var map_position:Vector2 = _new_GetCoord.vector_to_index(object.position.x, object.position.y)
+		map[map_position.x][map_position.y].walkable = true
+		text_out("You open the door")
+
+
 func attack(attacker, defender):
 	defender.health_current -= attacker.damage
 	$Text_Log.set_text("%s strikes %s for %s damage!\n%s" % [attacker.entity_name,
@@ -368,6 +396,7 @@ func enemy_phase():
 			movement_type(entities[i])
 	create_corpses()
 	update_status_screen()
+	update_floor_tiles()
 	player_turn = true
 
 
@@ -390,6 +419,29 @@ func update_inventory_panel():
 	for i in range(empty_slot_number):
 		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
 
+#Cosmetic function that makes occupied floor tiles invisible
+func update_floor_tiles():
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			map[i][j].visible = true
+	for i in range(entities.size()):
+		var index_position:Vector2 = _new_GetCoord.vector_to_index(entities[i].position.x, entities[i].position.y)
+		map[index_position.x][index_position.y].visible = false
+	for i in range(items.size()):
+		var index_position:Vector2 = _new_GetCoord.vector_to_index(items[i].position.x, items[i].position.y)
+		map[index_position.x][index_position.y].visible = false
+
+
+func trim_text_readout():
+	var line_count = $Text_Log.get_line_count()
+	if line_count > 30:
+		for i in range(line_count - 30, -1, -1):
+			$Text_Log.remove_line(i)
+
+
+func text_out(string:String):
+	$Text_Log.text = "%s\n%s" % [string, $Text_Log.text]
+
 
 func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool):
 	var terrain = terrain_scene.instance()
@@ -411,7 +463,7 @@ func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:S
 
 
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
-		entity_damage:int, entity_energy_max:int = 0,  entity_walkable:bool = false, alive:bool = true ):
+		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",  entity_walkable:bool = false, alive:bool = true ):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
@@ -452,8 +504,10 @@ func create_room_object(x, y, object_scene:PackedScene, object_name:String):
 	var room_object = object_scene.instance()
 	room_object.position = _new_GetCoord.index_to_vector(x, y)
 	room_object.room_object_name = object_name
+	objects.append(room_object)
+	get_parent().remove_child(map[x][y])
 	get_parent().add_child(room_object)
-	map[x][y] = room_object
+	map[x][y].walkable = false
 	# if not walkable remove astar node, ya dingus
 
 
