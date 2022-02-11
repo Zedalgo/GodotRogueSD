@@ -1,6 +1,6 @@
 extends Node2D
 
-
+var white_pixel:PackedScene = preload("res://sprite/WhitePixel.tscn")
 # Sprite scenes
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
@@ -15,10 +15,9 @@ var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var _HelperFunc = preload("res://library/HelperFunctions.gd").new()
 var astar = AStar2D.new()
-var map_gen_astar = AStar2D.new()
-# Don't remember why these are like this, probably load bearing
+#var map_gen_astar = AStar2D.new()
+# Done for convenence, probably an awful idea
 var player:Sprite
-var wall:Sprite
 # Arrays
 var entities:Array = []
 var inventory:Array = []
@@ -58,9 +57,9 @@ func _unhandled_input(Input):
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
 	if (map_generated == true) && (player_turn == true) && (player.alive == true):
 		if Input.is_action_pressed("select"):
-			print("Mouse at:", get_global_mouse_position())
+			print(entities)
 		if Input.is_action_pressed("debug_key"):
-			print(astar.get_closest_point(player.position))
+			print(astar.is_point_disabled(astar.get_closest_point(player.position)), astar.get_closest_point(player.position))
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -239,34 +238,39 @@ func generate_map():
 		for j in range(map[i].size()):
 			if map[i][j].walkable == true:
 				astar.add_point(k, map[i][j].position)
-				print("Creating Node at:", map[i][j].position)
 				k += 1
-			if map[i-1][j].position == astar.get_point_position(astar.get_closest_point(map[i-1][j].position)):
-				astar.connect_points(astar.get_closest_point(map[i-1][j].position), astar.get_closest_point(map[i][j].position))
-			if map[i][j-1].position == astar.get_point_position(astar.get_closest_point(map[i][j-1].position)):
-				astar.connect_points(astar.get_closest_point(map[i][j-1].position), astar.get_closest_point(map[i][j].position))
-	# Detects where doors should be placed and turns the tile red 
+			if astar.get_point_count() > 0:
+				if map[i-1][j].walkable == true && map[i][j].walkable == true:
+					astar.connect_points(astar.get_closest_point(map[i-1][j].position), astar.get_closest_point(map[i][j].position))
+				if map[i][j-1].walkable == true && map[i][j].walkable == true:
+					astar.connect_points(astar.get_closest_point(map[i][j-1].position), astar.get_closest_point(map[i][j].position))
+	
+	# Detects where doors should be placed and puts one there, disables astar node underneath. Reenabled on door open
 	for i in range(room_list.size()):
 		var room_map_x:int = (4*room_list[i][0]) + 2
 		var room_map_y:int = (4*room_list[i][1]) + 2
 		var room_number:int = room_list[i][2]
 		var same_room:bool = false
-		if room_list[i][0] < 7:# Check Right wall
+		if room_list[i][0] < 7:# Check Right wall if not in right column
 			if map[room_map_x + 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall":
-					create_room_object(room_map_x + 2, room_map_y, _door_scene, "door")
-		if room_list[i][0] > 0:# Check Left Wall
+					create_room_object(room_map_x + 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x + 2][room_map_y].position))
+					astar.set_point_disabled(astar.get_closest_point(map[room_map_x + 2][room_map_y].position), true)
+		if room_list[i][0] > 0:# Check Left Wall if not in left column
 			if map[room_map_x - 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall":
-					create_room_object(room_map_x - 2, room_map_y, _door_scene, "door")
-		if room_list[i][1] < 3:# Check Bottom Wall
+					create_room_object(room_map_x - 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x - 2][room_map_y].position))
+					astar.set_point_disabled(astar.get_closest_point(map[room_map_x - 2][room_map_y].position))
+		if room_list[i][1] < 3:# Check Bottom Wall if not in bottom row
 			if map[room_map_x][room_map_y + 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall":
-					create_room_object(room_map_x, room_map_y + 2, _door_scene, "door")
-		if room_list[i][1] > 0:#Check top Wall
+					create_room_object(room_map_x, room_map_y + 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y + 2].position))
+					astar.set_point_disabled(astar.get_closest_point(map[room_map_x][room_map_y + 2].position))
+		if room_list[i][1] > 0:#Check top Wall if not in top row
 			if map[room_map_x][room_map_y - 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall":
-					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door")
+					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
+					astar.set_point_disabled(astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
 	
 	
 	# Put doors on hallways by checking rooms to see if there's a hallway tile in place of a wall
@@ -293,9 +297,9 @@ func generate_map():
 	# Create the Player on a random empty room space
 	var spawn_room:int = randi() % room_list.size()
 	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
-	for i in range(3):
+	for _i in range(3):
 		var enemy_spawn:int = randi() % room_list.size()
-		create_entity(4 * room_list[enemy_spawn][0] + 2, 4 * room_list[enemy_spawn][1] + 2, _d_lower_scene, "dwarf", 10, 1, 3, "AStar")
+		create_entity(4 * room_list[enemy_spawn][0] + 2, 4 * room_list[enemy_spawn][1] + 2, _d_lower_scene, "drone", 10, 3, 3)
 	
 	# generate enemies on the map
 	# generate items on the map
@@ -378,6 +382,9 @@ func try_object(object):
 		var map_position:Vector2 = _new_GetCoord.vector_to_index(object.position.x, object.position.y)
 		map[map_position.x][map_position.y].walkable = true
 		text_out("You open the door")
+		astar.set_point_disabled(object.astar_node, false)
+		if player_turn == true:
+			player_turn = false
 
 
 func attack(attacker, defender):
@@ -406,9 +413,7 @@ func update_status_screen():
 	$EnergyBar.max_value = player.energy_max
 	$EnergyBar.value = player.energy_current
 	$TurnTracker.text = "Turn: %s" % turn_number
-	var health_percent = round(100 * (player.health_current / player.health_max))
-	var energy_percent = round(100 * (player.energy_current / player.energy_max))
-	$StatusScreen.text = "%s%s\n%s%s" % [health_percent, "%", energy_percent, "%"]
+	$StatusScreen.text = "%s%s%s\n%s%s%s" % [player.health_current, "/", player.health_max , player.energy_current, "/", player.energy_max]
 
 
 func update_inventory_panel():
@@ -474,6 +479,7 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entity.damage = entity_damage
 	entity.walkable = entity_walkable
 	entity.alive = alive
+	entity.move_type = movement_style
 	entity.z_index = 1
 	get_parent().add_child(entity)
 	entities.append(entity)
@@ -500,21 +506,25 @@ func create_corpses():
 			entities.remove(i)
 
 # Creates terrain pieces like fountains that will replace floor tiles after base map generation
-func create_room_object(x, y, object_scene:PackedScene, object_name:String):
+func create_room_object(x, y, object_scene:PackedScene, object_name:String, astar_node:int):
 	var room_object = object_scene.instance()
 	room_object.position = _new_GetCoord.index_to_vector(x, y)
 	room_object.room_object_name = object_name
+	room_object.astar_node = astar_node
 	objects.append(room_object)
-	get_parent().remove_child(map[x][y])
 	get_parent().add_child(room_object)
 	map[x][y].walkable = false
-	# if not walkable remove astar node, ya dingus
 
-
+# Determines pathfinding based on entity.move_type tag
+# ToDo - Coward - Flees from player
+# ToDo - Ambush - Waits until the player has interacted with it first
+# Astar - Most direct pursuit of player, sees doors as obstacled
+# ToDo - Roam - Wandering until player spotted, switch tag to AStar once seen
+# ToDo - Smart - Once player seen, takes more direct routes, factoring in door shortcuts, might require a second astar node array
 func movement_type(moving_entity):
 	if moving_entity.move_type == "AStar":
 		var path_to_player:Array = astar.get_point_path(astar.get_closest_point(moving_entity.position), astar.get_closest_point(player.position))
-		var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
-		var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
-		try_move(moving_entity, dx, dy)
-	pass
+		if path_to_player.size() > 0:
+			var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
+			var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
+			try_move(moving_entity, dx, dy)
