@@ -9,3 +9,6 @@ var health_max:int
 var damage:int
 var move_type:String
 var walkable:bool
+
+##Tags will be string labels that define traits. ex: "Machine", "Flying", "Organic"
+var tags:Array = []

@@ -51,7 +51,7 @@ func _unhandled_input(Input):
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
-		create_entity(-1, -1, _player_scene, "player", 10, 5, 10, "Player")
+		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", false, ["Meat"])
 		player = entities[0]
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
@@ -77,7 +77,9 @@ func _unhandled_input(Input):
 					items.remove(i)
 					player_turn = false
 					break
-				elif inventory.size() >= 10:
+				elif i == 0:
+					text_out("There's nothing there")
+				elif inventory.size() >= 9:
 					$Text_Log.text = "You can't carry any more!\n%s" % $Text_Log.text
 				else:
 					pass
@@ -107,7 +109,6 @@ func generate_map():
 	room_list = []
 	var number_of_rooms:int = randi() % 2 + 6
 	var growth_ticks:int = 3 * number_of_rooms
-	
 	for i in range(number_of_rooms):
 		var macro_x:int = rand_range(0, 8)
 		var macro_y:int = rand_range(0, 4)
@@ -255,27 +256,51 @@ func generate_map():
 			if map[room_map_x + 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall":
 					create_room_object(room_map_x + 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x + 2][room_map_y].position))
-					astar.set_point_disabled(astar.get_closest_point(map[room_map_x + 2][room_map_y].position), true)
 		if room_list[i][0] > 0:# Check Left Wall if not in left column
 			if map[room_map_x - 2][room_map_y].terrain_name == "floor":
 				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall":
 					create_room_object(room_map_x - 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x - 2][room_map_y].position))
-					astar.set_point_disabled(astar.get_closest_point(map[room_map_x - 2][room_map_y].position))
 		if room_list[i][1] < 3:# Check Bottom Wall if not in bottom row
 			if map[room_map_x][room_map_y + 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall":
 					create_room_object(room_map_x, room_map_y + 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y + 2].position))
-					astar.set_point_disabled(astar.get_closest_point(map[room_map_x][room_map_y + 2].position))
 		if room_list[i][1] > 0:#Check top Wall if not in top row
 			if map[room_map_x][room_map_y - 2].terrain_name == "floor":
 				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall":
 					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
-					astar.set_point_disabled(astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
 	
-	
-	# Put doors on hallways by checking rooms to see if there's a hallway tile in place of a wall
-	# Use a check if either side(x+-1) is a floor, but the other sides(y+-1) aren't also floor
-	# Also want to check if it's the same room
+	# Places player, enemies, items and room objects randomly in rooms
+	var spawn_room:int = randi() % room_list.size()
+	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
+	var occupied_space:Array = [player.position]
+	for i in range(room_list.size()):
+		for j in range(2):
+			var random_roll:int = randi() % 10 #Random number 0-9
+			var rand_x = 4 * room_list[i][0] + 1 + randi() % 3
+			var rand_y = 4 * room_list[i][1] + 1 + randi() % 3
+			if random_roll <=1:
+				var occupied:bool = false
+				for l in range(occupied_space.size()):
+					if occupied_space[l] == _new_GetCoord.index_to_vector(rand_x, rand_y):
+						occupied == true
+				if occupied == false:
+					create_entity(rand_x, rand_y, _d_lower_scene, "Drone", 10, 3, 0, "AStar", false, ["Machine"])
+					occupied_space.append(_new_GetCoord.index_to_vector(rand_x, rand_y))
+			if random_roll == 2:
+				create_item(rand_x, rand_y, _o_scene, "Power Cell")
+			if random_roll == 3:
+				var door_check:bool = false
+				for l in range(objects.size()):
+					if objects[l].position == _new_GetCoord.index_to_vector(rand_x+1, rand_y):
+						door_check = true
+					if objects[l].position == _new_GetCoord.index_to_vector(rand_x-1, rand_y):
+						door_check = true
+					if objects[l].position == _new_GetCoord.index_to_vector(rand_x, rand_y+1):
+						door_check = true
+					if objects[l].position == _new_GetCoord.index_to_vector(rand_x, rand_y-1):
+						door_check = true
+				if door_check == false:
+					create_room_object(rand_x, rand_y, _fountain_scene, "Battery Charger", astar.get_closest_point(_new_GetCoord.index_to_vector(rand_x, rand_y)))
 	
 		# Done - set first room on the grid
 		# Done - for subsequent rooms, check for overlap
@@ -285,21 +310,10 @@ func generate_map():
 		# Done - hallways
 		# Done - doors, detection done, door entity done, astar disabling done, astar enabling wip
 		# Done - random player start
-		# enemies
+		# Done - Sorta - Enemy spawning
 		# items
 		# recharge station - energy
 		
-	# Place Astar nodes on floor tiles
-	# Connect astar nodes
-	# Note: Might have to do 2 above steps after terrain features
-			
-	# create terrain features
-	# Create the Player on a random empty room space
-	var spawn_room:int = randi() % room_list.size()
-	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
-	for _i in range(3):
-		var enemy_spawn:int = randi() % room_list.size()
-		create_entity(4 * room_list[enemy_spawn][0] + 2, 4 * room_list[enemy_spawn][1] + 2, _d_lower_scene, "drone", 10, 3, 3)
 	
 	# generate enemies on the map
 	# generate items on the map
@@ -466,9 +480,9 @@ func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:S
 	get_parent().remove_child(map[index_x][index_y])
 	map[index_x][index_y] = terrain
 
-
+# Creates a creature with stats, some form of movement type, and optional tags
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
-		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",  entity_walkable:bool = false, alive:bool = true ):
+		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",  entity_walkable:bool = false, descriptor_tags:Array = []):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
@@ -478,8 +492,9 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entity.energy_current = entity.energy_max
 	entity.damage = entity_damage
 	entity.walkable = entity_walkable
-	entity.alive = alive
+	entity.alive = true
 	entity.move_type = movement_style
+	entity.tags = descriptor_tags
 	entity.z_index = 1
 	get_parent().add_child(entity)
 	entities.append(entity)
@@ -497,7 +512,12 @@ func create_corpses():
 	for i in range(entities.size()-1, -1, -1):
 		if entities[i].alive == false:
 			var corpse = _corpse_scene.instance()
-			corpse.item_name = "%s corpse" % entities[i].entity_name
+			for j in range(entities[i].tags.size()):
+				if entities[i].tags[j] == "Machine":
+					corpse.item_name = "%s scrap" % entities[i].entity_name
+				# Check for meat creature tag second so cyborgs will have corpses instead of scrap
+				if entities[i].tags[j] == "Meat":
+					corpse.item_name = "%s corpse" % entities[i].entity_name
 			corpse.position = entities[i].position
 			#p rint(_new_GetCoord.vector_to_index(corpse.position.x, corpse.position.y))
 			get_parent().add_child(corpse)
@@ -511,6 +531,7 @@ func create_room_object(x, y, object_scene:PackedScene, object_name:String, asta
 	room_object.position = _new_GetCoord.index_to_vector(x, y)
 	room_object.room_object_name = object_name
 	room_object.astar_node = astar_node
+	astar.set_point_disabled(astar_node)
 	objects.append(room_object)
 	get_parent().add_child(room_object)
 	map[x][y].walkable = false
@@ -524,7 +545,7 @@ func create_room_object(x, y, object_scene:PackedScene, object_name:String, asta
 func movement_type(moving_entity):
 	if moving_entity.move_type == "AStar":
 		var path_to_player:Array = astar.get_point_path(astar.get_closest_point(moving_entity.position), astar.get_closest_point(player.position))
-		if path_to_player.size() > 0:
+		if path_to_player.size() > 1:
 			var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
 			var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
 			try_move(moving_entity, dx, dy)
