@@ -15,8 +15,8 @@ var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var _HelperFunc = preload("res://library/HelperFunctions.gd").new()
 var astar = AStar2D.new()
-#var map_gen_astar = AStar2D.new()
-# Done for convenence, probably an awful idea
+# var map_gen_astar = AStar2D.new()
+# Done for convenence, since the player has some unique stuff from everything else
 var player:Sprite
 # Arrays
 var entities:Array = []
@@ -27,15 +27,14 @@ var objects:Array = []
 var room_list:Array = []
 # Booleans
 var map_generated:bool = false
+var normal_movement:bool = true
 var player_turn:bool = true
 # Constants
 # Integers
 var tile_width:int = 16
 var tile_height:int = 24
 var turn_number:int = 0
-##### Notes #####
-# Z Index: {-1:terrain, 0:items, 1:entities}
-# Text readout stores forever, will want to limit that eventually
+
 ##### To Do After Basic Gameplay#####
 # Score
 # Hichscore tracking
@@ -47,15 +46,18 @@ func _ready():
 
 # Handles player inputs
 func _unhandled_input(Input):
+	# Handles start screen input (space to start)
 	if Input.is_action_pressed("start_game") && map_generated == false:
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
 		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", false, ["Meat"])
 		player = entities[0]
+		player.view_range = 3
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
-	if (map_generated == true) && (player_turn == true) && (player.alive == true):
+	
+	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (normal_movement == true):
 		if Input.is_action_pressed("select"):
 			print(entities)
 		if Input.is_action_pressed("debug_key"):
@@ -84,6 +86,17 @@ func _unhandled_input(Input):
 				else:
 					pass
 		
+		# Need a way to do line of sight before aiming weapon works properly
+		if normal_movement == false:
+			if Input.is_action_pressed("move_down"):
+				pass
+			if Input.is_action_pressed("move_up"):
+				pass
+			if Input.is_action_pressed("move_right"):
+				pass
+			if Input.is_action_pressed("move_left"):
+				pass
+		
 		if player_turn == false:
 			turn_number += 1
 			# Heal back 1 health every ten turns
@@ -95,6 +108,7 @@ func _unhandled_input(Input):
 			update_floor_tiles()
 			create_corpses()
 			enemy_phase()
+			update_fov(player)
 
 
 func generate_map():
@@ -311,8 +325,10 @@ func generate_map():
 		# Done - doors, detection done, door entity done, astar disabling done, astar enabling wip
 		# Done - random player start
 		# Done - Sorta - Enemy spawning
-		# items
-		# recharge station - energy
+		
+		# Ranged Attack
+		# items, spawn done, functionality wip
+		# recharge station - energy, spawn done, func wip
 		
 	
 	# generate enemies on the map
@@ -438,7 +454,7 @@ func update_inventory_panel():
 	for i in range(empty_slot_number):
 		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
 
-#Cosmetic function that makes occupied floor tiles invisible
+# Cosmetic function that makes occupied floor tiles invisible
 func update_floor_tiles():
 	for i in range(map.size()):
 		for j in range(map[i].size()):
@@ -449,6 +465,36 @@ func update_floor_tiles():
 	for i in range(items.size()):
 		var index_position:Vector2 = _new_GetCoord.vector_to_index(items[i].position.x, items[i].position.y)
 		map[index_position.x][index_position.y].visible = false
+
+# Reveals tiles on player view and dims visited tiles outside it
+func update_fov(entity):
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			if map[i][j].seen == true:
+				map[i][j].modulate = Color(0, 1, 0)
+			if map[i][j].seen == false:
+				map[i][j].modulate = Color(0, 0, 0)
+	# Figure out what's in view
+	# Reveal things
+	# Dim revealed stuff out of view
+	var start_x:int = entity.position.x - (entity.view_range * tile_width)
+	var start_y:int = entity.position.y - (entity.view_range * tile_height)
+	var entity_position_node:int = astar.get_closest_point(entity.position)
+	for i in range(entity.view_range * 2 + 1):
+		for j in range(entity.view_range * 2 + 1):
+			var xpos = i * tile_width + start_x
+			var ypos = j * tile_height + start_y
+			var astar_node_at_position = astar.get_closest_point(Vector2(xpos, ypos))
+			var astar_array:Array = astar.get_point_path(astar_node_at_position, entity_position_node)
+			# ToDo - Prevent wrapping view around walls, and seeing through walls
+			# Missing view on certain door directions
+			
+			if astar_array.size() - 1 == (abs(entity.position.x - xpos) / tile_width) + (abs(entity.position.y - ypos) / tile_height):
+				for k in range(astar_array.size()):
+					var index_pos_x = astar_array[k][0] / tile_width
+					var index_pos_y = astar_array[k][1] / tile_height
+					map[index_pos_x][index_pos_y].modulate = Color(1, 0, 0)
+	pass
 
 
 func trim_text_readout():
@@ -515,11 +561,12 @@ func create_corpses():
 			for j in range(entities[i].tags.size()):
 				if entities[i].tags[j] == "Machine":
 					corpse.item_name = "%s scrap" % entities[i].entity_name
+					corpse.modulate = Color(0.5, 0.5, 0.5)
 				# Check for meat creature tag second so cyborgs will have corpses instead of scrap
 				if entities[i].tags[j] == "Meat":
 					corpse.item_name = "%s corpse" % entities[i].entity_name
+					corpse.modulate = Color(1, 0, 0)
 			corpse.position = entities[i].position
-			#p rint(_new_GetCoord.vector_to_index(corpse.position.x, corpse.position.y))
 			get_parent().add_child(corpse)
 			items.append(corpse)
 			get_parent().remove_child(entities[i])
