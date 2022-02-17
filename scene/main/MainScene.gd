@@ -34,6 +34,8 @@ var player_turn:bool = true
 var tile_width:int = 16
 var tile_height:int = 24
 var turn_number:int = 0
+# Update floor tiles after LoS, or floor will be visible under sprites
+
 
 ##### To Do After Basic Gameplay#####
 # Score
@@ -61,7 +63,9 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("select"):
 			print(entities)
 		if Input.is_action_pressed("debug_key"):
-			print(astar.is_point_disabled(astar.get_closest_point(player.position)), astar.get_closest_point(player.position))
+			var placeholder = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+			map[placeholder.x][placeholder.y].visible = false
+			print(placeholder.x, ", ", placeholder.y)
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -105,10 +109,10 @@ func _unhandled_input(Input):
 			trim_text_readout()
 			update_inventory_panel()
 			update_status_screen()
-			update_floor_tiles()
 			create_corpses()
 			enemy_phase()
 			update_fov(player)
+			#update_floor_tiles()
 
 
 func generate_map():
@@ -116,7 +120,7 @@ func generate_map():
 	for i in range(33):
 		map.append([])
 		for j in range(17):
-			var _wall = place_terrain(i, j, _wall_scene, "wall", false)
+			var _wall = place_terrain(i, j, _wall_scene, "wall", false, true)
 			map[i].append(_wall)
 		
 	# Room Generation
@@ -156,7 +160,7 @@ func generate_map():
 		replace_index_y = (macro_y * 4) + 2
 		for a in range(replace_index_x - 1, replace_index_x + 2):
 			for b in range(replace_index_y - 1, replace_index_y + 2):
-				replace_terrain(a, b, _floor_scene, "floor", true)
+				replace_terrain(a, b, _floor_scene, "floor", true, false)
 	
 	#Create Hallways between rooms, ensuring there's a route to every one without being spaghetti
 	for i in range(room_list.size()):
@@ -175,15 +179,15 @@ func generate_map():
 		
 		if first_direction == 0: # Horizontal First
 			for a in range(root_x, target_x, x_inc_dec):
-				replace_terrain(a, root_y, _floor_scene, "floor", true)
+				replace_terrain(a, root_y, _floor_scene, "floor", true, false)
 			for b in range(root_y, target_y, y_inc_dec):
-				replace_terrain(target_x, b, _floor_scene, "floor", true)
+				replace_terrain(target_x, b, _floor_scene, "floor", true, false)
 			
 		if first_direction == 1: # Vertical First
 			for b in range(root_y, target_y, y_inc_dec):
-				replace_terrain(root_x, b, _floor_scene, "floor", true)
+				replace_terrain(root_x, b, _floor_scene, "floor", true, false)
 			for a in range(root_x, target_x, x_inc_dec):
-				replace_terrain(a, target_y, _floor_scene, "floor", true)
+				replace_terrain(a, target_y, _floor_scene, "floor", true, false)
 		
 	#Expands the initial rooms in a similar way to initial gen, just tethered to the room selected for growth
 	var growth_var:int = 0
@@ -226,25 +230,25 @@ func generate_map():
 				room_list.append(room_coords)
 				for a in range(replace_index_x - 2, replace_index_x + 2):
 					for b in range(replace_index_y - 1, replace_index_y + 2):
-						replace_terrain(a, b, _floor_scene, "floor", true)
+						replace_terrain(a, b, _floor_scene, "floor", true, false)
 			if direction == 1 && macro_x > 0:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
 				for a in range(replace_index_x - 1, replace_index_x + 3):
 					for b in range(replace_index_y - 1, replace_index_y + 2):
-						replace_terrain(a, b, _floor_scene, "floor", true)
+						replace_terrain(a, b, _floor_scene, "floor", true, false)
 			if direction == 2 && macro_y < 3:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
 				for a in range(replace_index_x - 1, replace_index_x + 2):
 					for b in range(replace_index_y - 2, replace_index_y + 2):
-						replace_terrain(a, b, _floor_scene, "floor", true)
+						replace_terrain(a, b, _floor_scene, "floor", true, false)
 			if direction == 3 && macro_y > 0:
 				room_coords = [macro_x, macro_y, room_number]
 				room_list.append(room_coords)
 				for a in range(replace_index_x - 1, replace_index_x + 2):
 					for b in range(replace_index_y - 1, replace_index_y + 3):
-						replace_terrain(a, b, _floor_scene, "floor", true)
+						replace_terrain(a, b, _floor_scene, "floor", true, false)
 			growth_var += 1
 	
 	# Generates the astar array and connects the points of the grid
@@ -324,21 +328,23 @@ func generate_map():
 		# Done - hallways
 		# Done - doors, detection done, door entity done, astar disabling done, astar enabling wip
 		# Done - random player start
-		# Done - Sorta - Enemy spawning
+		# Done - Enemy spawning
 		
 		# Ranged Attack
 		# items, spawn done, functionality wip
 		# recharge station - energy, spawn done, func wip
 		
-	
-	# generate enemies on the map
-	# generate items on the map
-	
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			map[i][j].visible = false
+	for i in range(entities.size() - 1, 1, 1):
+		entities[i].visible = false
 	
 	# Initial appearance of the info panels 
 	update_inventory_panel()
 	update_status_screen()
 	trim_text_readout()
+	update_fov(player)
 	update_floor_tiles()
 
 
@@ -448,7 +454,7 @@ func update_status_screen():
 
 func update_inventory_panel():
 	$InventoryScreen.text = "Inventory:\n"
-	var empty_slot_number:int = 9 - inventory.size()
+	var empty_slot_number:int = 10 - inventory.size()
 	for i in range(inventory.size()):
 		$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
 	for i in range(empty_slot_number):
@@ -461,40 +467,50 @@ func update_floor_tiles():
 			map[i][j].visible = true
 	for i in range(entities.size()):
 		var index_position:Vector2 = _new_GetCoord.vector_to_index(entities[i].position.x, entities[i].position.y)
+		print(index_position)
 		map[index_position.x][index_position.y].visible = false
 	for i in range(items.size()):
 		var index_position:Vector2 = _new_GetCoord.vector_to_index(items[i].position.x, items[i].position.y)
 		map[index_position.x][index_position.y].visible = false
 
 # Reveals tiles on player view and dims visited tiles outside it
+# Setting up to be usable for enemy LoS as well, hopefully
 func update_fov(entity):
 	for i in range(map.size()):
 		for j in range(map[i].size()):
 			if map[i][j].seen == true:
 				map[i][j].modulate = Color(0, 1, 0)
-			if map[i][j].seen == false:
-				map[i][j].modulate = Color(0, 0, 0)
-	# Figure out what's in view
-	# Reveal things
-	# Dim revealed stuff out of view
-	var start_x:int = entity.position.x - (entity.view_range * tile_width)
-	var start_y:int = entity.position.y - (entity.view_range * tile_height)
-	var entity_position_node:int = astar.get_closest_point(entity.position)
+			else:
+				map[i][j].modulate = Color(0, 0, 1)
+	for i in range(entities.size()-1, 0, -1):
+		entities[i].modulate = Color(0, 0, 1)
+	# Sets anything in the given range to visible
+	var top_left_x:int = entity.position.x - (entity.view_range * tile_width)
+	var top_left_y:int = entity.position.y - (entity.view_range * tile_height)
 	for i in range(entity.view_range * 2 + 1):
 		for j in range(entity.view_range * 2 + 1):
-			var xpos = i * tile_width + start_x
-			var ypos = j * tile_height + start_y
-			var astar_node_at_position = astar.get_closest_point(Vector2(xpos, ypos))
-			var astar_array:Array = astar.get_point_path(astar_node_at_position, entity_position_node)
-			# ToDo - Prevent wrapping view around walls, and seeing through walls
-			# Missing view on certain door directions
-			
-			if astar_array.size() - 1 == (abs(entity.position.x - xpos) / tile_width) + (abs(entity.position.y - ypos) / tile_height):
-				for k in range(astar_array.size()):
-					var index_pos_x = astar_array[k][0] / tile_width
-					var index_pos_y = astar_array[k][1] / tile_height
-					map[index_pos_x][index_pos_y].modulate = Color(1, 0, 0)
-	pass
+			var tile_x:int = top_left_x + (i * tile_width)
+			var tile_y:int = top_left_y + (j * tile_height)
+			var total_index_displacement:int = (abs(tile_x - entity.position.x) / tile_width) + (abs(tile_y - entity.position.y) / tile_height)
+			var current_position:Vector2 = entity.position
+			for k in range(total_index_displacement):
+				current_position.x += (tile_x - current_position.x) / (total_index_displacement - k)
+				current_position.y += (tile_y - current_position.y) / (total_index_displacement - k)
+				var current_index:Vector2 = _new_GetCoord.vector_to_index(current_position.x, current_position.y)
+				var vision_blocked_by_object:bool = false
+				for a in range(objects.size()):
+					if objects[a].position == _new_GetCoord.index_to_vector(current_index.x, current_index.y):
+						vision_blocked_by_object = true
+				if map[current_index.x][current_index.y].blocks_vision == true || vision_blocked_by_object == true:
+					map[current_index.x][current_index.y].modulate = Color(1, 0, 0)
+					map[current_index.x][current_index.y].seen = true
+					break
+				else:
+					map[current_index.x][current_index.y].modulate = Color(1, 0, 0)
+					map[current_index.x][current_index.y].seen = true
+					for a in range(entities.size() - 1, 0, -1):
+						if entities[a].position == _new_GetCoord.index_to_vector(current_index.x, current_index.y):
+							entities[a].modulate = Color(1, 0, 0)
 
 
 func trim_text_readout():
@@ -508,20 +524,22 @@ func text_out(string:String):
 	$Text_Log.text = "%s\n%s" % [string, $Text_Log.text]
 
 
-func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool):
+func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool, blocks_vision:bool):
 	var terrain = terrain_scene.instance()
 	terrain.position = _new_GetCoord.index_to_vector(x, y)
 	terrain.terrain_name = terrain_name
 	terrain.walkable = walkable
+	terrain.blocks_vision = blocks_vision
 	get_parent().add_child(terrain)
 	return terrain
 
 
-func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:String, walkable:bool) -> void:
+func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:String, walkable:bool, blocks_vision:bool) -> void:
 	var terrain = terrain_scene.instance()
 	terrain.position = _new_GetCoord.index_to_vector(index_x, index_y)
 	terrain.terrain_name = terrain_name
 	terrain.walkable = walkable
+	terrain.blocks_vision = blocks_vision
 	get_parent().add_child(terrain)
 	get_parent().remove_child(map[index_x][index_y])
 	map[index_x][index_y] = terrain

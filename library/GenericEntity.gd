@@ -8,6 +8,8 @@ var health_current:int
 var health_max:int
 var damage:int
 var move_type:String
+var saw_player:bool = false
+var seen_by_player:bool = false
 var view_range:int
 var walkable:bool
 
