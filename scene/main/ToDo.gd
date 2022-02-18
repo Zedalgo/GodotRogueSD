@@ -2,6 +2,8 @@ To Do (Core Systems)
 (Current Working) Vision Related:
 	open doors shouldnt block vision
 
+Rework Mapgen - Items, entities, objects
+	Can do it better as 1 roll per room with a table of results
 
 -Ranged Attack
 --Costs energy to use

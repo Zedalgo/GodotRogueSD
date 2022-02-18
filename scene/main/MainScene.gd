@@ -18,6 +18,7 @@ var astar = AStar2D.new()
 # var map_gen_astar = AStar2D.new()
 # Done for convenence, since the player has some unique stuff from everything else
 var player:Sprite
+var aim_tile:Sprite
 # Arrays
 var entities:Array = []
 var inventory:Array = []
@@ -27,8 +28,8 @@ var objects:Array = []
 var room_list:Array = []
 # Booleans
 var map_generated:bool = false
-var normal_movement:bool = true
 var player_turn:bool = true
+var shoot_mode:bool = false
 # Constants
 # Integers
 var tile_width:int = 16
@@ -58,14 +59,20 @@ func _unhandled_input(Input):
 		player.view_range = 3
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
+		update_fov(player)
+		# Yellow tile used for shooting
+		aim_tile = _wall_scene.instance()
+		aim_tile.modulate = Color(1, 1, 0, 0.5)
+		aim_tile.z_index = -5
+		aim_tile.visible = false
+		get_parent().add_child(aim_tile)
 	
-	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (normal_movement == true):
+	#Normal movement, melee attacking
+	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false):
 		if Input.is_action_pressed("select"):
 			print(entities)
 		if Input.is_action_pressed("debug_key"):
-			var placeholder = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-			map[placeholder.x][placeholder.y].visible = false
-			print(placeholder.x, ", ", placeholder.y)
+			astar_debug()
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -89,18 +96,11 @@ func _unhandled_input(Input):
 					$Text_Log.text = "You can't carry any more!\n%s" % $Text_Log.text
 				else:
 					pass
-		
-		# Need a way to do line of sight before aiming weapon works properly
-		if normal_movement == false:
-			if Input.is_action_pressed("move_down"):
-				pass
-			if Input.is_action_pressed("move_up"):
-				pass
-			if Input.is_action_pressed("move_right"):
-				pass
-			if Input.is_action_pressed("move_left"):
-				pass
-		
+		if Input.is_action_pressed("shoot"):
+			shoot_mode = true
+			aim_tile.position = player.position
+			aim_tile.visible = true
+	
 		if player_turn == false:
 			turn_number += 1
 			# Heal back 1 health every ten turns
@@ -112,8 +112,26 @@ func _unhandled_input(Input):
 			create_corpses()
 			enemy_phase()
 			update_fov(player)
-			#update_floor_tiles()
-
+	
+	if shoot_mode == true:
+		if Input.is_action_pressed("move_down"):
+			aim_tile.position.y += 24
+		if Input.is_action_pressed("move_up"):
+			aim_tile.position.y -= 24
+		if Input.is_action_pressed("move_right"):
+			aim_tile.position.x += 16
+		if Input.is_action_pressed("move_left"):
+			aim_tile.position.x -= 16
+		if Input.is_action_pressed("cancel"):
+			shoot_mode = false
+			aim_tile.visible = false
+		if Input.is_action_pressed("enter"):
+			for i in range(entities.size()):
+				if entities[i].position == aim_tile.position:
+					attack(player, entities[i], true)
+					aim_tile.visible = false
+			shoot_mode = false
+			player_turn = false
 
 func generate_map():
 	#Fill space with walls, populate the map array
@@ -345,7 +363,6 @@ func generate_map():
 	update_status_screen()
 	trim_text_readout()
 	update_fov(player)
-	update_floor_tiles()
 
 
 # Identifies any entities in a grid index tile and brints them to the console
@@ -417,17 +434,22 @@ func try_object(object):
 		object.modulate = Color(0.5, 0.5, 0.5)
 		var map_position:Vector2 = _new_GetCoord.vector_to_index(object.position.x, object.position.y)
 		map[map_position.x][map_position.y].walkable = true
+		object.blocks_vision = false
 		text_out("You open the door")
 		astar.set_point_disabled(object.astar_node, false)
 		if player_turn == true:
 			player_turn = false
 
 
-func attack(attacker, defender):
-	defender.health_current -= attacker.damage
-	$Text_Log.set_text("%s strikes %s for %s damage!\n%s" % [attacker.entity_name,
-			 defender.entity_name, attacker.damage, $Text_Log.get_text()])
-	# checks health and creates corpses for dead entities, will need to move to it's own function later
+func attack(attacker, defender, ranged:bool = false):
+	if ranged == false:
+		defender.health_current -= attacker.damage
+		$Text_Log.set_text("%s strikes %s for %s damage!\n%s" % [attacker.entity_name,
+				 defender.entity_name, attacker.damage, $Text_Log.get_text()])
+	else:
+		defender.health_current -= attacker.ranged_damage
+		text_out("%s shoots %s for %s damage!\n" %[attacker.entity_name,
+				defender.entity_name, attacker.ranged_damage])
 	if defender.health_current <= 0:
 		defender.alive = false
 		defender.walkable = true
@@ -439,7 +461,6 @@ func enemy_phase():
 			movement_type(entities[i])
 	create_corpses()
 	update_status_screen()
-	update_floor_tiles()
 	player_turn = true
 
 
@@ -460,18 +481,6 @@ func update_inventory_panel():
 	for i in range(empty_slot_number):
 		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
 
-# Cosmetic function that makes occupied floor tiles invisible
-func update_floor_tiles():
-	for i in range(map.size()):
-		for j in range(map[i].size()):
-			map[i][j].visible = true
-	for i in range(entities.size()):
-		var index_position:Vector2 = _new_GetCoord.vector_to_index(entities[i].position.x, entities[i].position.y)
-		print(index_position)
-		map[index_position.x][index_position.y].visible = false
-	for i in range(items.size()):
-		var index_position:Vector2 = _new_GetCoord.vector_to_index(items[i].position.x, items[i].position.y)
-		map[index_position.x][index_position.y].visible = false
 
 # Reveals tiles on player view and dims visited tiles outside it
 # Setting up to be usable for enemy LoS as well, hopefully
@@ -479,11 +488,18 @@ func update_fov(entity):
 	for i in range(map.size()):
 		for j in range(map[i].size()):
 			if map[i][j].seen == true:
-				map[i][j].modulate = Color(0, 1, 0)
+				map[i][j].modulate.a = 0.5
 			else:
-				map[i][j].modulate = Color(0, 0, 1)
+				map[i][j].visible = false
 	for i in range(entities.size()-1, 0, -1):
-		entities[i].modulate = Color(0, 0, 1)
+		entities[i].visible = false
+	for i in range(objects.size()):
+		if objects[i].seen != true:
+			objects[i].visible = false
+	for i in range(items.size()):
+		items[i].visible = false
+	
+	
 	# Sets anything in the given range to visible
 	var top_left_x:int = entity.position.x - (entity.view_range * tile_width)
 	var top_left_y:int = entity.position.y - (entity.view_range * tile_height)
@@ -499,18 +515,26 @@ func update_fov(entity):
 				var current_index:Vector2 = _new_GetCoord.vector_to_index(current_position.x, current_position.y)
 				var vision_blocked_by_object:bool = false
 				for a in range(objects.size()):
-					if objects[a].position == _new_GetCoord.index_to_vector(current_index.x, current_index.y):
+					if objects[a].position == _new_GetCoord.index_to_vector(current_index.x, current_index.y) && objects[a].blocks_vision == true:
 						vision_blocked_by_object = true
+						objects[a].seen = true
+						objects[a].visible = true
 				if map[current_index.x][current_index.y].blocks_vision == true || vision_blocked_by_object == true:
-					map[current_index.x][current_index.y].modulate = Color(1, 0, 0)
+					map[current_index.x][current_index.y].visible = true
 					map[current_index.x][current_index.y].seen = true
+					map[current_index.x][current_index.y].modulate.a = 1
 					break
 				else:
-					map[current_index.x][current_index.y].modulate = Color(1, 0, 0)
+					map[current_index.x][current_index.y].visible = true
 					map[current_index.x][current_index.y].seen = true
-					for a in range(entities.size() - 1, 0, -1):
+					for a in range(entities.size()):
 						if entities[a].position == _new_GetCoord.index_to_vector(current_index.x, current_index.y):
-							entities[a].modulate = Color(1, 0, 0)
+							entities[a].visible = true
+							map[current_index.x][current_index.y].visible = false
+					for a in range(items.size()):
+						if items[a].position == current_position:
+							items[a].visible = true
+							map[current_index.x][current_index.y].visible = false
 
 
 func trim_text_readout():
@@ -573,28 +597,36 @@ func create_item(x, y, item_scene:PackedScene, item_name:String):
 
 
 func create_corpses():
-	for i in range(entities.size()-1, -1, -1):
+	for i in range(entities.size() - 1, -1, -1):
 		if entities[i].alive == false:
-			var corpse = _corpse_scene.instance()
-			for j in range(entities[i].tags.size()):
-				if entities[i].tags[j] == "Machine":
-					corpse.item_name = "%s scrap" % entities[i].entity_name
-					corpse.modulate = Color(0.5, 0.5, 0.5)
-				# Check for meat creature tag second so cyborgs will have corpses instead of scrap
-				if entities[i].tags[j] == "Meat":
-					corpse.item_name = "%s corpse" % entities[i].entity_name
-					corpse.modulate = Color(1, 0, 0)
-			corpse.position = entities[i].position
-			get_parent().add_child(corpse)
-			items.append(corpse)
-			get_parent().remove_child(entities[i])
+			create_corpse(entities[i])
+
+
+func create_corpse(entity):
+	var corpse = _corpse_scene.instance()
+	for i in range(entity.tags.size()):
+		if entity.tags[i] == "Machine":
+			corpse.item_name = "%s scrap" % entities[i].entity_name
+			corpse.modulate = Color(0.5, 0.5, 0.5)
+		# Check for meat creature tag second so cyborgs will have corpses instead of scrap
+		if entity.tags[i] == "Meat":
+			corpse.item_name = "%s corpse" % entities[i].entity_name
+			corpse.modulate = Color(1, 0, 0)
+	corpse.position = entity.position
+	get_parent().add_child(corpse)
+	items.append(corpse)
+	get_parent().remove_child(entity)
+	for i in range(entities.size()):
+		if entities[i] == entity:
 			entities.remove(i)
+			break
 
 # Creates terrain pieces like fountains that will replace floor tiles after base map generation
-func create_room_object(x, y, object_scene:PackedScene, object_name:String, astar_node:int):
+func create_room_object(x, y, object_scene:PackedScene, object_name:String, astar_node:int, blocks_vision:bool = true):
 	var room_object = object_scene.instance()
 	room_object.position = _new_GetCoord.index_to_vector(x, y)
 	room_object.room_object_name = object_name
+	room_object.blocks_vision = blocks_vision
 	room_object.astar_node = astar_node
 	astar.set_point_disabled(astar_node)
 	objects.append(room_object)
@@ -614,3 +646,19 @@ func movement_type(moving_entity):
 			var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
 			var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
 			try_move(moving_entity, dx, dy)
+
+
+func astar_debug():
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			if map[i][j].position == astar.get_point_position(astar.get_closest_point(map[i][j].position)):
+				var astar_node = astar.get_closest_point(map[i][j].position)
+				var wpxl = white_pixel.instance()
+				wpxl.position = map[i][j].position
+				var connections:Array = astar.get_point_connections(astar_node)
+				get_parent().add_child(wpxl)
+				for k in range(connections.size()):
+					var rpxl = white_pixel.instance()
+					rpxl.modulate = Color(1, 0, 0)
+					rpxl.position = (astar.get_point_position(astar_node) + astar.get_point_position(connections[k])) / 2
+					get_parent().add_child(rpxl)
