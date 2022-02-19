@@ -30,8 +30,10 @@ var room_list:Array = []
 var map_generated:bool = false
 var player_turn:bool = true
 var shoot_mode:bool = false
+var use_mode:bool = false
 # Constants
 # Integers
+var slot_number:int = 0 # Used for item selection in use_mode
 var tile_width:int = 16
 var tile_height:int = 24
 var turn_number:int = 0
@@ -54,9 +56,10 @@ func _unhandled_input(Input):
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		$Text_Log.set_text("Generating map...")
-		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", false, ["Meat"])
+		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", ["Meat"], 5)
 		player = entities[0]
 		player.view_range = 3
+		player.ranged_attack_cost = 2
 		generate_map()
 		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
 		update_fov(player)
@@ -68,7 +71,7 @@ func _unhandled_input(Input):
 		get_parent().add_child(aim_tile)
 	
 	#Normal movement, melee attacking
-	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false):
+	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (use_mode == false):
 		if Input.is_action_pressed("select"):
 			print(entities)
 		if Input.is_action_pressed("debug_key"):
@@ -100,19 +103,15 @@ func _unhandled_input(Input):
 			shoot_mode = true
 			aim_tile.position = player.position
 			aim_tile.visible = true
+		
+		if Input.is_action_pressed("use_item"):
+			slot_number = 0
+			use_mode = true
 	
 		if player_turn == false:
-			turn_number += 1
-			# Heal back 1 health every ten turns
-			if (player.health_current < player.health_max) && (turn_number % 10 == 0):
-				player.health_current += 1
-			trim_text_readout()
-			update_inventory_panel()
-			update_status_screen()
-			create_corpses()
-			enemy_phase()
-			update_fov(player)
+			end_player_turn()
 	
+	# Aiming the target tile and doing ranged damage
 	if shoot_mode == true:
 		if Input.is_action_pressed("move_down"):
 			aim_tile.position.y += 24
@@ -126,12 +125,42 @@ func _unhandled_input(Input):
 			shoot_mode = false
 			aim_tile.visible = false
 		if Input.is_action_pressed("enter"):
-			for i in range(entities.size()):
-				if entities[i].position == aim_tile.position:
-					attack(player, entities[i], true)
-					aim_tile.visible = false
-			shoot_mode = false
-			player_turn = false
+			if player.energy_current >= player.ranged_attack_cost:
+				for i in range(entities.size()):
+					if entities[i].position == aim_tile.position:
+						attack(player, entities[i], true)
+				aim_tile.visible = false
+				player.energy_current -= player.ranged_attack_cost
+				shoot_mode = false
+				player_turn = false
+				end_player_turn()
+			else:
+				text_out("Not enough energy!")
+	
+	# Using inventory items
+	if use_mode == true:
+		if inventory.size() > 0:
+			update_inventory_panel(slot_number)
+			if Input.is_action_pressed("move_up"):
+				if slot_number > 0:
+					slot_number -= 1
+					update_inventory_panel(slot_number)
+			if Input.is_action_pressed("move_down"):
+				if slot_number < 9:
+					slot_number += 1
+					update_inventory_panel(slot_number)
+			if Input.is_action_pressed("enter"):
+				use_item(inventory[slot_number], player)
+				inventory.remove(slot_number)
+				use_mode = false
+				end_player_turn()
+				
+			if Input.is_action_pressed("cancel"):
+				use_mode = false
+				update_inventory_panel(-1)
+		else:
+			text_out("There is nothing in your inventory.")
+			use_mode = false
 
 func generate_map():
 	#Fill space with walls, populate the map array
@@ -320,10 +349,10 @@ func generate_map():
 					if occupied_space[l] == _new_GetCoord.index_to_vector(rand_x, rand_y):
 						occupied == true
 				if occupied == false:
-					create_entity(rand_x, rand_y, _d_lower_scene, "Drone", 10, 3, 0, "AStar", false, ["Machine"])
+					create_entity(rand_x, rand_y, _d_lower_scene, "Drone", 10, 3, 0, "AStar", ["Machine"])
 					occupied_space.append(_new_GetCoord.index_to_vector(rand_x, rand_y))
 			if random_roll == 2:
-				create_item(rand_x, rand_y, _o_scene, "Power Cell")
+				create_item(rand_x, rand_y, _o_scene, "Power Cell", 0, 5, ["Restore"])
 			if random_roll == 3:
 				var door_check:bool = false
 				for l in range(objects.size()):
@@ -359,7 +388,7 @@ func generate_map():
 		entities[i].visible = false
 	
 	# Initial appearance of the info panels 
-	update_inventory_panel()
+	update_inventory_panel(-1)
 	update_status_screen()
 	trim_text_readout()
 	update_fov(player)
@@ -441,6 +470,23 @@ func try_object(object):
 			player_turn = false
 
 
+func use_item(item, entity):
+	for i in range(item.item_tags.size()):
+		if item.item_tags[i] == "Restore":
+			entity.health_current += item.health
+			entity.energy_current += item.energy
+		if item.item_tags[i] == "Increase":
+			entity.health_current += item.health
+			entity.health_max += item.health
+			entity.energy_current += item.energy
+			entity.energy_max += item.energy
+			# Prevent going over max, would "clamp" be better in this case?
+			if entity.energy_current > entity.energy_max:
+				entity.energy_current = entity.energy_max
+			if entity.health_current > entity.health_max:
+				entity.health_current = entity.health_max
+
+
 func attack(attacker, defender, ranged:bool = false):
 	if ranged == false:
 		defender.health_current -= attacker.damage
@@ -473,13 +519,16 @@ func update_status_screen():
 	$StatusScreen.text = "%s%s%s\n%s%s%s" % [player.health_current, "/", player.health_max , player.energy_current, "/", player.energy_max]
 
 
-func update_inventory_panel():
+func update_inventory_panel(inventory_slot_num):
 	$InventoryScreen.text = "Inventory:\n"
 	var empty_slot_number:int = 10 - inventory.size()
 	for i in range(inventory.size()):
-		$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
+		if inventory_slot_num == i:
+			$InventoryScreen.text = "%s>%s) %s<\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
+		else:
+			$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
 	for i in range(empty_slot_number):
-		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size()) + 1]
+		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size() + 1)]
 
 
 # Reveals tiles on player view and dims visited tiles outside it
@@ -498,7 +547,6 @@ func update_fov(entity):
 			objects[i].visible = false
 	for i in range(items.size()):
 		items[i].visible = false
-	
 	
 	# Sets anything in the given range to visible
 	var top_left_x:int = entity.position.x - (entity.view_range * tile_width)
@@ -570,7 +618,8 @@ func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:S
 
 # Creates a creature with stats, some form of movement type, and optional tags
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
-		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",  entity_walkable:bool = false, descriptor_tags:Array = []):
+		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",
+		descriptor_tags:Array = [], ranged_attack_damage:int = 1,  entity_walkable:bool = false):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
@@ -579,6 +628,7 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entity.energy_max = entity_energy_max
 	entity.energy_current = entity.energy_max
 	entity.damage = entity_damage
+	entity.ranged_damage = ranged_attack_damage
 	entity.walkable = entity_walkable
 	entity.alive = true
 	entity.move_type = movement_style
@@ -588,29 +638,33 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entities.append(entity)
 
 
-func create_item(x, y, item_scene:PackedScene, item_name:String):
+func create_item(x, y, item_scene:PackedScene, item_name:String, health:int = 0, energy:int = 0, string_tags:Array = []):
 	var item = item_scene.instance()
 	item.position = _new_GetCoord.index_to_vector(x, y)
 	item.item_name = item_name
+	item.health = health
+	item.energy = energy
+	for i in range(string_tags.size()):
+		item.item_tags.append(string_tags[i])
 	get_parent().add_child(item)
 	items.append(item)
 
-
+# Checks for anything dead and calls create_corpse
 func create_corpses():
 	for i in range(entities.size() - 1, -1, -1):
 		if entities[i].alive == false:
 			create_corpse(entities[i])
 
-
+# Specific create_item function for dead entities
 func create_corpse(entity):
 	var corpse = _corpse_scene.instance()
 	for i in range(entity.tags.size()):
 		if entity.tags[i] == "Machine":
-			corpse.item_name = "%s scrap" % entities[i].entity_name
+			corpse.item_name = "%s scrap" % entity.entity_name
 			corpse.modulate = Color(0.5, 0.5, 0.5)
 		# Check for meat creature tag second so cyborgs will have corpses instead of scrap
 		if entity.tags[i] == "Meat":
-			corpse.item_name = "%s corpse" % entities[i].entity_name
+			corpse.item_name = "%s corpse" % entity.entity_name
 			corpse.modulate = Color(1, 0, 0)
 	corpse.position = entity.position
 	get_parent().add_child(corpse)
@@ -646,6 +700,19 @@ func movement_type(moving_entity):
 			var dx:int = (path_to_player[1].x - path_to_player[0].x) / tile_width
 			var dy:int = (path_to_player[1].y - path_to_player[0].y) / tile_height
 			try_move(moving_entity, dx, dy)
+
+
+func end_player_turn():
+	turn_number += 1
+	# Heal back 1 health every ten turns
+	if (player.health_current < player.health_max) && (turn_number % 10 == 0):
+		player.health_current += 1
+	trim_text_readout()
+	update_inventory_panel(-1)
+	update_status_screen()
+	create_corpses()
+	enemy_phase()
+	update_fov(player)
 
 
 func astar_debug():
