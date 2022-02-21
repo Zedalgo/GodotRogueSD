@@ -30,7 +30,7 @@ var room_list:Array = []
 var map_generated:bool = false
 var player_turn:bool = true
 var shoot_mode:bool = false
-var use_mode:bool = false
+var inventory_mode:bool = false
 # Constants
 # Integers
 var slot_number:int = 0 # Used for item selection in use_mode
@@ -55,13 +55,13 @@ func _unhandled_input(Input):
 	if Input.is_action_pressed("start_game") && map_generated == false:
 		$SpaceToGenMap.visible = false
 		map_generated = true
-		$Text_Log.set_text("Generating map...")
+		text_out("Generating Map...")
 		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", ["Meat"], 5)
 		player = entities[0]
 		player.view_range = 3
 		player.ranged_attack_cost = 2
 		generate_map()
-		$Text_Log.set_text("Map generated.\n%s" % $Text_Log.get_text())
+		text_out("Map Generated")
 		update_fov(player)
 		# Yellow tile used for shooting
 		aim_tile = _wall_scene.instance()
@@ -71,11 +71,12 @@ func _unhandled_input(Input):
 		get_parent().add_child(aim_tile)
 	
 	#Normal movement, melee attacking
-	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (use_mode == false):
+	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false):
 		if Input.is_action_pressed("select"):
 			print(entities)
 		if Input.is_action_pressed("debug_key"):
-			astar_debug()
+			var coords:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+			create_item(coords.x, coords.y, _o_scene, "Test Cell", 1, 1, ["Increase", "Restore"], Color(1, 0, 1))
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -85,28 +86,31 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("move_left"):
 			try_move(player, -1, 0)
 		if Input.is_action_pressed("get"):
+			var item_found:bool = false
+			var item_index:int
 			for i in range(items.size() - 1, -1, -1):
-				if (items[i].position == player.position) && (inventory.size() < 10):
-					inventory.append(items[i])
-					$Text_Log.text = "You picked up the %s\n%s" % [items[i].item_name, $Text_Log.text]
-					get_parent().remove_child(items[i])
-					items.remove(i)
-					player_turn = false
-					break
-				elif i == 0:
-					text_out("There's nothing there")
-				elif inventory.size() >= 9:
-					$Text_Log.text = "You can't carry any more!\n%s" % $Text_Log.text
-				else:
-					pass
+				print(items[i].position)
+				if (items[i].position == player.position):
+					item_found = true
+					item_index = i
+			if item_found == true && inventory.size() < 10:
+				inventory.append(items[item_index])
+				text_out("You picked up the %s" % items[item_index].item_name)
+				get_parent().remove_child(items[item_index])
+				items.remove(item_index)
+				player_turn = false
+			elif item_found == true && inventory.size() > 9:
+				text_out("You can't carry any more!")
+			elif item_found == false:
+				text_out("There's nothing there")
 		if Input.is_action_pressed("shoot"):
 			shoot_mode = true
 			aim_tile.position = player.position
 			aim_tile.visible = true
 		
-		if Input.is_action_pressed("use_item"):
+		if Input.is_action_pressed("open_inventory"):
 			slot_number = 0
-			use_mode = true
+			inventory_mode = true
 	
 		if player_turn == false:
 			end_player_turn()
@@ -138,7 +142,7 @@ func _unhandled_input(Input):
 				text_out("Not enough energy!")
 	
 	# Using inventory items
-	if use_mode == true:
+	if inventory_mode == true:
 		if inventory.size() > 0:
 			update_inventory_panel(slot_number)
 			if Input.is_action_pressed("move_up"):
@@ -150,17 +154,18 @@ func _unhandled_input(Input):
 					slot_number += 1
 					update_inventory_panel(slot_number)
 			if Input.is_action_pressed("enter"):
-				use_item(inventory[slot_number], player)
-				inventory.remove(slot_number)
-				use_mode = false
-				end_player_turn()
+				if slot_number < inventory.size():
+					use_item(inventory[slot_number], player)
+					inventory.remove(slot_number)
+					inventory_mode = false
+					end_player_turn()
 				
 			if Input.is_action_pressed("cancel"):
-				use_mode = false
+				inventory_mode = false
 				update_inventory_panel(-1)
 		else:
 			text_out("There is nothing in your inventory.")
-			use_mode = false
+			inventory_mode = false
 
 func generate_map():
 	#Fill space with walls, populate the map array
@@ -480,21 +485,21 @@ func use_item(item, entity):
 			entity.health_max += item.health
 			entity.energy_current += item.energy
 			entity.energy_max += item.energy
-			# Prevent going over max, would "clamp" be better in this case?
-			if entity.energy_current > entity.energy_max:
-				entity.energy_current = entity.energy_max
-			if entity.health_current > entity.health_max:
-				entity.health_current = entity.health_max
+		# Prevent going over max, would "clamp" be better in this case?
+		if entity.energy_current > entity.energy_max:
+			entity.energy_current = entity.energy_max
+		if entity.health_current > entity.health_max:
+			entity.health_current = entity.health_max
 
 
 func attack(attacker, defender, ranged:bool = false):
 	if ranged == false:
 		defender.health_current -= attacker.damage
-		$Text_Log.set_text("%s strikes %s for %s damage!\n%s" % [attacker.entity_name,
-				 defender.entity_name, attacker.damage, $Text_Log.get_text()])
+		text_out("%s strikes %s for %s damage!" % [attacker.entity_name,
+				 defender.entity_name, attacker.damage])
 	else:
 		defender.health_current -= attacker.ranged_damage
-		text_out("%s shoots %s for %s damage!\n" %[attacker.entity_name,
+		text_out("%s shoots %s for %s damage!" % [attacker.entity_name,
 				defender.entity_name, attacker.ranged_damage])
 	if defender.health_current <= 0:
 		defender.alive = false
@@ -587,13 +592,14 @@ func update_fov(entity):
 
 func trim_text_readout():
 	var line_count = $Text_Log.get_line_count()
-	if line_count > 30:
-		for i in range(line_count - 30, -1, -1):
+	if line_count > 20:
+		for i in range(line_count - 1, 20, -1):
 			$Text_Log.remove_line(i)
 
 
 func text_out(string:String):
 	$Text_Log.text = "%s\n%s" % [string, $Text_Log.text]
+	trim_text_readout()
 
 
 func place_terrain(x, y, terrain_scene:PackedScene, terrain_name:String, walkable:bool, blocks_vision:bool):
@@ -638,12 +644,13 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entities.append(entity)
 
 
-func create_item(x, y, item_scene:PackedScene, item_name:String, health:int = 0, energy:int = 0, string_tags:Array = []):
+func create_item(x, y, item_scene:PackedScene, item_name:String, health:int = 0, energy:int = 0, string_tags:Array = [], item_color:Color = Color(1, 1, 1)):
 	var item = item_scene.instance()
 	item.position = _new_GetCoord.index_to_vector(x, y)
 	item.item_name = item_name
 	item.health = health
 	item.energy = energy
+	item.modulate = item_color
 	for i in range(string_tags.size()):
 		item.item_tags.append(string_tags[i])
 	get_parent().add_child(item)
@@ -657,18 +664,22 @@ func create_corpses():
 
 # Specific create_item function for dead entities
 func create_corpse(entity):
-	var corpse = _corpse_scene.instance()
+	var corpse_position:Vector2 = _new_GetCoord.vector_to_index(entity.position.x, entity.position.y)
+	var item_name:String = entity.entity_name
+	var corpse_color:Color = Color(0.5, 0.5, 0.5)
+	var corpse_tags:Array = ["Corpse"]
 	for i in range(entity.tags.size()):
+		print(entity.tags[i])
 		if entity.tags[i] == "Machine":
-			corpse.item_name = "%s scrap" % entity.entity_name
-			corpse.modulate = Color(0.5, 0.5, 0.5)
+			item_name = "%s scrap" % entity.entity_name
+			corpse_color = Color(0.5, 0.5, 0.5)
+			corpse_tags.append("Tech")
 		# Check for meat creature tag second so cyborgs will have corpses instead of scrap
 		if entity.tags[i] == "Meat":
-			corpse.item_name = "%s corpse" % entity.entity_name
-			corpse.modulate = Color(1, 0, 0)
-	corpse.position = entity.position
-	get_parent().add_child(corpse)
-	items.append(corpse)
+			item_name = "%s corpse" % entity.entity_name
+			corpse_color = Color(1, 0, 0)
+			corpse_tags.append("Meat")
+	create_item(corpse_position.x, corpse_position.y, _corpse_scene, item_name, 0, 0, corpse_tags, corpse_color)
 	get_parent().remove_child(entity)
 	for i in range(entities.size()):
 		if entities[i] == entity:
@@ -690,7 +701,7 @@ func create_room_object(x, y, object_scene:PackedScene, object_name:String, asta
 # Determines pathfinding based on entity.move_type tag
 # ToDo - Coward - Flees from player
 # ToDo - Ambush - Waits until the player has interacted with it first
-# Astar - Most direct pursuit of player, sees doors as obstacled
+# Astar - Most direct pursuit of player, sees doors as obstacles
 # ToDo - Roam - Wandering until player spotted, switch tag to AStar once seen
 # ToDo - Smart - Once player seen, takes more direct routes, factoring in door shortcuts, might require a second astar node array
 func movement_type(moving_entity):
@@ -707,7 +718,6 @@ func end_player_turn():
 	# Heal back 1 health every ten turns
 	if (player.health_current < player.health_max) && (turn_number % 10 == 0):
 		player.health_current += 1
-	trim_text_readout()
 	update_inventory_panel(-1)
 	update_status_screen()
 	create_corpses()
