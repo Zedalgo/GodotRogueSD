@@ -73,10 +73,10 @@ func _unhandled_input(Input):
 	#Normal movement, melee attacking
 	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false):
 		if Input.is_action_pressed("select"):
-			print(entities)
+			pass
 		if Input.is_action_pressed("debug_key"):
 			var coords:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-			create_item(coords.x, coords.y, _o_scene, "Test Cell", 1, 1, ["Increase", "Restore"], Color(1, 0, 1))
+			create_item(coords.x, coords.y, _o_scene, "Test Cell", 1, 1, ["increase", "restore"], Color(1, 0, 1))
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -89,7 +89,6 @@ func _unhandled_input(Input):
 			var item_found:bool = false
 			var item_index:int
 			for i in range(items.size() - 1, -1, -1):
-				print(items[i].position)
 				if (items[i].position == player.position):
 					item_found = true
 					item_index = i
@@ -159,7 +158,13 @@ func _unhandled_input(Input):
 					inventory.remove(slot_number)
 					inventory_mode = false
 					end_player_turn()
-				
+			if Input.is_action_pressed("drop"):
+				var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+				create_item(player_index.x, player_index.y, inventory[slot_number].image_scene, inventory[slot_number].item_name,
+						inventory[slot_number].health, inventory[slot_number].energy, inventory[slot_number].item_tags, inventory[slot_number].image_color)
+				inventory.remove(slot_number)
+				inventory_mode = false
+				end_player_turn()
 			if Input.is_action_pressed("cancel"):
 				inventory_mode = false
 				update_inventory_panel(-1)
@@ -340,38 +345,43 @@ func generate_map():
 					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
 	
 	# Places player, enemies, items and room objects randomly in rooms
-	var spawn_room:int = randi() % room_list.size()
-	player.position = _new_GetCoord.index_to_vector(4 * room_list[spawn_room][0] + 2, 4 * room_list[spawn_room][1] + 2)
-	var occupied_space:Array = [player.position]
+	player.position = _new_GetCoord.index_to_vector(4 * room_list[0][0] + 2, 4 * room_list[0][1] + 2)
 	for i in range(room_list.size()):
-		for j in range(2):
-			var random_roll:int = randi() % 10 #Random number 0-9
-			var rand_x = 4 * room_list[i][0] + 1 + randi() % 3
-			var rand_y = 4 * room_list[i][1] + 1 + randi() % 3
-			if random_roll <=1:
-				var occupied:bool = false
-				for l in range(occupied_space.size()):
-					if occupied_space[l] == _new_GetCoord.index_to_vector(rand_x, rand_y):
-						occupied == true
-				if occupied == false:
-					create_entity(rand_x, rand_y, _d_lower_scene, "Drone", 10, 3, 0, "AStar", ["Machine"])
-					occupied_space.append(_new_GetCoord.index_to_vector(rand_x, rand_y))
-			if random_roll == 2:
-				create_item(rand_x, rand_y, _o_scene, "Power Cell", 0, 5, ["Restore"])
-			if random_roll == 3:
-				var door_check:bool = false
-				for l in range(objects.size()):
-					if objects[l].position == _new_GetCoord.index_to_vector(rand_x+1, rand_y):
-						door_check = true
-					if objects[l].position == _new_GetCoord.index_to_vector(rand_x-1, rand_y):
-						door_check = true
-					if objects[l].position == _new_GetCoord.index_to_vector(rand_x, rand_y+1):
-						door_check = true
-					if objects[l].position == _new_GetCoord.index_to_vector(rand_x, rand_y-1):
-						door_check = true
-				if door_check == false:
-					create_room_object(rand_x, rand_y, _fountain_scene, "Battery Charger", astar.get_closest_point(_new_GetCoord.index_to_vector(rand_x, rand_y)))
-	
+		var random_roll:int = randi() % 2
+		var luck_roll:int = randi() % 2
+		var room_index:Vector2 = Vector2(4 * room_list[i][0] + 2, 4 * room_list[i][1] + 2)
+		var random_x:int = randi() % 3 - 1
+		var random_y:int = randi() % 3 - 1
+		var rand_item:int
+		var rand_enemy:int
+		var rand_object:int
+		match random_roll:
+			0: # Rolled Nothing
+				pass
+			1: # 1 item
+				rand_item = randi() % 2
+				if rand_item == 0:
+					create_item(room_index.x + random_x, room_index.y + random_y, _o_scene, "Energy Cell",
+							0, 4, ["restore"], Color(0.5, 0.5, 1))
+				elif rand_item == 1:
+					create_item(room_index.x + random_x, room_index.y + random_y, _o_scene, "Medical Kit",
+							6, 0, ["restore"], Color(1, 0.5, 0.5))
+			2: # 1 enemy
+				pass
+			3: # 1 enemy, 1 item
+				pass
+			4: # 2 enemies
+				pass
+			5: # 2 items
+				pass
+			6: # 2 enemies & an item
+				pass
+			7: # 1 enemy, item, and room object
+				pass
+			8: #  1 item and room object
+				pass
+			9: # Monster Room or Loot Room
+				pass
 		# Done - set first room on the grid
 		# Done - for subsequent rooms, check for overlap
 		# Done - handle expanding rooms
@@ -477,10 +487,10 @@ func try_object(object):
 
 func use_item(item, entity):
 	for i in range(item.item_tags.size()):
-		if item.item_tags[i] == "Restore":
+		if item.item_tags[i] == "restore":
 			entity.health_current += item.health
 			entity.energy_current += item.energy
-		if item.item_tags[i] == "Increase":
+		if item.item_tags[i] == "increase":
 			entity.health_current += item.health
 			entity.health_max += item.health
 			entity.energy_current += item.energy
@@ -651,6 +661,8 @@ func create_item(x, y, item_scene:PackedScene, item_name:String, health:int = 0,
 	item.health = health
 	item.energy = energy
 	item.modulate = item_color
+	item.image_scene = item_scene
+	item.image_color = item_color
 	for i in range(string_tags.size()):
 		item.item_tags.append(string_tags[i])
 	get_parent().add_child(item)
@@ -669,7 +681,6 @@ func create_corpse(entity):
 	var corpse_color:Color = Color(0.5, 0.5, 0.5)
 	var corpse_tags:Array = ["Corpse"]
 	for i in range(entity.tags.size()):
-		print(entity.tags[i])
 		if entity.tags[i] == "Machine":
 			item_name = "%s scrap" % entity.entity_name
 			corpse_color = Color(0.5, 0.5, 0.5)
