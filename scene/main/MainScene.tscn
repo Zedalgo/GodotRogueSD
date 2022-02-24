@@ -26,7 +26,7 @@ __meta__ = {
 }
 
 [node name="Line2D" type="Line2D" parent="."]
-points = PoolVector2Array( 533, 410, 0, 410 )
+points = PoolVector2Array( 800, 410, 0, 410 )
 default_color = Color( 1, 1, 1, 1 )
 
 [node name="Line2D2" type="Line2D" parent="."]
@@ -60,12 +60,13 @@ __meta__ = {
 }
 
 [node name="TurnTracker" type="RichTextLabel" parent="."]
-margin_left = 572.0
-margin_top = 182.0
-margin_right = 797.0
-margin_bottom = 198.0
+margin_left = 541.0
+margin_top = 165.0
+margin_right = 766.0
+margin_bottom = 200.0
 custom_fonts/mono_font = SubResource( 1 )
-text = "Turn: 33"
+text = "Floor 1
+Turn: 33"
 __meta__ = {
 "_edit_use_anchors_": false
 }

@@ -11,6 +11,7 @@ var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
 var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
+var _plus_scene:PackedScene = preload("res://sprite/PlusSign.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
 var _HelperFunc = preload("res://library/HelperFunctions.gd").new()
@@ -33,6 +34,7 @@ var shoot_mode:bool = false
 var inventory_mode:bool = false
 # Constants
 # Integers
+var floor_number:int = 0
 var slot_number:int = 0 # Used for item selection in use_mode
 var tile_width:int = 16
 var tile_height:int = 24
@@ -92,13 +94,13 @@ func _unhandled_input(Input):
 				if (items[i].position == player.position):
 					item_found = true
 					item_index = i
-			if item_found == true && inventory.size() < 10:
+			if item_found == true && inventory.size() < 12:
 				inventory.append(items[item_index])
 				text_out("You picked up the %s" % items[item_index].item_name)
 				get_parent().remove_child(items[item_index])
 				items.remove(item_index)
 				player_turn = false
-			elif item_found == true && inventory.size() > 9:
+			elif item_found == true && inventory.size() > 11:
 				text_out("You can't carry any more!")
 			elif item_found == false:
 				text_out("There's nothing there")
@@ -179,7 +181,10 @@ func generate_map():
 		for j in range(17):
 			var _wall = place_terrain(i, j, _wall_scene, "wall", false, true)
 			map[i].append(_wall)
-		
+	
+	# Floor number iterates
+	floor_number += 1
+	
 	# Room Generation
 	room_list = []
 	var number_of_rooms:int = randi() % 2 + 6
@@ -349,7 +354,7 @@ func generate_map():
 	for i in range(room_list.size()):
 		var random_roll:int = randi() % 2
 		var luck_roll:int = randi() % 2
-		var room_index:Vector2 = Vector2(4 * room_list[i][0] + 2, 4 * room_list[i][1] + 2)
+		var room_vector_coords:Vector2 = Vector2(4 * room_list[i][0] + 2, 4 * room_list[i][1] + 2)
 		var random_x:int = randi() % 3 - 1
 		var random_y:int = randi() % 3 - 1
 		var rand_item:int
@@ -359,27 +364,21 @@ func generate_map():
 			0: # Rolled Nothing
 				pass
 			1: # 1 item
-				rand_item = randi() % 2
-				if rand_item == 0:
-					create_item(room_index.x + random_x, room_index.y + random_y, _o_scene, "Energy Cell",
-							0, 4, ["restore"], Color(0.5, 0.5, 1))
-				elif rand_item == 1:
-					create_item(room_index.x + random_x, room_index.y + random_y, _o_scene, "Medical Kit",
-							6, 0, ["restore"], Color(1, 0.5, 0.5))
+				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 			2: # 1 enemy
 				pass
-			3: # 1 enemy, 1 item
-				pass
+			3: # 1 item, 1 enemy
+				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 			4: # 2 enemies
 				pass
-			5: # 2 items
-				pass
-			6: # 2 enemies & an item
+			5: # 2 items, 1 enemy
+				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+			6: # 2 items, 2 enemies
 				pass
 			7: # 1 enemy, item, and room object
-				pass
+				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 			8: #  1 item and room object
-				pass
+				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 			9: # Monster Room or Loot Room
 				pass
 		# Done - set first room on the grid
@@ -530,13 +529,13 @@ func update_status_screen():
 	$HealthBar.value = player.health_current
 	$EnergyBar.max_value = player.energy_max
 	$EnergyBar.value = player.energy_current
-	$TurnTracker.text = "Turn: %s" % turn_number
+	$TurnTracker.text = "Floor Number: %s\nTurn: %s" % [floor_number, turn_number]
 	$StatusScreen.text = "%s%s%s\n%s%s%s" % [player.health_current, "/", player.health_max , player.energy_current, "/", player.energy_max]
 
 
 func update_inventory_panel(inventory_slot_num):
 	$InventoryScreen.text = "Inventory:\n"
-	var empty_slot_number:int = 10 - inventory.size()
+	var empty_slot_number:int = 12 - inventory.size()
 	for i in range(inventory.size()):
 		if inventory_slot_num == i:
 			$InventoryScreen.text = "%s>%s) %s<\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
@@ -734,6 +733,82 @@ func end_player_turn():
 	create_corpses()
 	enemy_phase()
 	update_fov(player)
+
+
+func roll_item(floor_num, vector_position:Vector2):
+	var random_roll:int = randi() % 5
+	var random_type_roll:int = randi() % 4
+	var coin_toss:int = randi() % 2
+	var item_name:String = "AnErrorHasOccurred"
+	var type:String
+	var health:int = 0
+	var energy:int = 0
+	var item_scene:PackedScene = _o_scene
+	var item_color:Color = Color(1, 1, 1)
+	match random_type_roll:
+		0, 1, 2:
+			type = "restore"
+		3:
+			type = "increase"
+	
+	match floor_num + random_roll:
+		1, 2, 3, 4, 5:
+			if type == "restore":
+				if coin_toss == 0:
+					health = 8
+					item_name = "Small Medical Hypo"
+					item_scene = _plus_scene
+					item_color = Color(1, 0, 0)
+				elif coin_toss == 1:
+					energy = 5
+					item_name = "Small Energy Cell"
+					item_scene = _o_scene
+					item_color = Color(0.5, 0.5, 1)
+			if type == "increase":
+				if coin_toss == 0:
+					health = 1
+					item_name = "Glowing Medical Hypo"
+					item_scene = _plus_scene
+					item_color = Color(1, 0.5, 0.5)
+				elif coin_toss == 1:
+					energy = 1
+					item_name = "Small Energy Capacitor"
+					item_scene = _o_scene
+					item_color = Color(0.25, 0.25, 1)
+		6, 7, 8, 9, 10:
+			if type == "restore":
+				if coin_toss == 0:
+					health = 16
+					item_name = "Medical Hypo"
+					item_scene = _plus_scene
+					item_color = Color(1, 0, 0)
+				elif coin_toss == 1:
+					energy = 10
+					item_name = "Energy Cell"
+					item_scene = _o_scene
+					item_color = Color(0.5, 0.5, 1)
+			if type == "increase":
+				if coin_toss == 0:
+					health = 2
+					item_name = "Large Glowing Medical Hypo"
+					item_scene = _plus_scene
+					item_color = Color(1, 0.5, 0.5)
+				elif coin_toss == 1:
+					energy = 1
+					item_name = "Energy Capacitor"
+					item_scene = _o_scene
+					item_color = Color(0.25, 0.25, 1)
+		11, 12, 13, 14, 15:
+			pass
+		16, 17, 18, 19, 20:
+			pass
+		21, 22:
+			pass
+		23, 24:
+			pass
+		
+	# Need to make scenes for items determined by 
+	create_item(vector_position.x, vector_position.y, item_scene, item_name, health, energy, [type], item_color)
 
 
 func astar_debug():
