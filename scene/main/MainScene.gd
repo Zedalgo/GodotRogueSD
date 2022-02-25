@@ -6,11 +6,13 @@ var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 var _d_lower_scene:PackedScene = preload("res://sprite/d_lower.tscn")
+var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
+var _s_scene:PackedScene = preload("res://sprite/s_lower.tscn")
 var _door_scene:PackedScene = preload("res://sprite/Door.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
-var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
+
 var _plus_scene:PackedScene = preload("res://sprite/PlusSign.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
@@ -77,8 +79,7 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("select"):
 			pass
 		if Input.is_action_pressed("debug_key"):
-			var coords:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-			create_item(coords.x, coords.y, _o_scene, "Test Cell", 1, 1, ["increase", "restore"], Color(1, 0, 1))
+			astar_debug()
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -352,7 +353,7 @@ func generate_map():
 	# Places player, enemies, items and room objects randomly in rooms
 	player.position = _new_GetCoord.index_to_vector(4 * room_list[0][0] + 2, 4 * room_list[0][1] + 2)
 	for i in range(room_list.size()):
-		var random_roll:int = randi() % 2
+		var random_roll:int = randi() % 10
 		var luck_roll:int = randi() % 2
 		var room_vector_coords:Vector2 = Vector2(4 * room_list[i][0] + 2, 4 * room_list[i][1] + 2)
 		var random_x:int = randi() % 3 - 1
@@ -360,40 +361,130 @@ func generate_map():
 		var rand_item:int
 		var rand_enemy:int
 		var rand_object:int
+		
+		var occupied_index:Vector2 = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+		var occupied_tiles:Array = []
+		var overlap:bool = false
+		
+		
 		match random_roll:
 			0: # Rolled Nothing
 				pass
+				
 			1: # 1 item
 				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				
 			2: # 1 enemy
-				pass
+				roll_enemy(floor_number, occupied_index)
+				
 			3: # 1 item, 1 enemy
 				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				
 			4: # 2 enemies
-				pass
+				roll_enemy(floor_number, occupied_index)
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				if room_vector_coords.x + random_x == occupied_index.x && room_vector_coords.y + random_y == occupied_index.y:
+					if random_x == 0 && random_y == 0:
+						random_x += 1
+					else:
+						random_x = random_x * -1
+						random_y = random_y * -1
+					occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				
 			5: # 2 items, 1 enemy
 				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_item(floor_number, occupied_index)
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				
 			6: # 2 items, 2 enemies
-				pass
+				roll_item(floor_number, occupied_index)
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_item(floor_number, occupied_index)
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				if room_vector_coords.x + random_x == occupied_index.x && room_vector_coords.y + random_y == occupied_index.y:
+					if random_x == 0 && random_y == 0:
+						random_x += 1
+					else:
+						random_x = random_x * -1
+						random_y = random_y * -1
+					occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				
 			7: # 1 enemy, item, and room object
 				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				var door_check_passed:bool = true
+				for a in range(objects.size()):
+					# checks for doors being blocked by the object
+					if _new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y - 1) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y + 1) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x + 1, occupied_index.y) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x - 1, occupied_index.y) == objects[a].position:
+						door_check_passed = false
+				if door_check_passed == true:
+					create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				if room_vector_coords.x + random_x == occupied_index.x && room_vector_coords.y + random_y == occupied_index.y:
+					if random_x == 0 && random_y == 0:
+						random_x += 1
+					else:
+						random_x = random_x * -1
+						random_y = random_y * -1
+					occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				roll_enemy(floor_number, occupied_index)
+				
 			8: #  1 item and room object
 				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
-			9: # Monster Room or Loot Room
-				pass
-		# Done - set first room on the grid
-		# Done - for subsequent rooms, check for overlap
-		# Done - handle expanding rooms
-		# Done - once this works, expand to generate actual spaces on the map with replace()
-		# Done - via room_number, which is room_coords[2] - union expansions of rooms to the greater room
-		# Done - hallways
-		# Done - doors, detection done, door entity done, astar disabling done, astar enabling wip
-		# Done - random player start
-		# Done - Enemy spawning
-		
-		# Ranged Attack
-		# items, spawn done, functionality wip
-		# recharge station - energy, spawn done, func wip
+				random_x = randi() % 3 - 1
+				random_y = randi() % 3 - 1
+				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
+				var door_check_passed:bool = true
+				for a in range(objects.size()):
+					# checks for doors being blocked by the object
+					if _new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y - 1) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y + 1) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x + 1, occupied_index.y) == objects[a].position:
+						door_check_passed = false
+					elif _new_GetCoord.index_to_vector(occupied_index.x - 1, occupied_index.y) == objects[a].position:
+						door_check_passed = false
+				if door_check_passed == true:
+					create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
+				
+			9: # Empty or Loot Room
+				var chance:int = randi() % 10
+				var lootcount:int = randi() % 3 + 3
+				if chance == 0:
+					for a in range(lootcount):
+						roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+						random_x = randi() % 3 - 1
+						random_y = randi() % 3 - 1
 		
 	for i in range(map.size()):
 		for j in range(map[i].size()):
@@ -634,7 +725,8 @@ func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:S
 # Creates a creature with stats, some form of movement type, and optional tags
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
 		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",
-		descriptor_tags:Array = [], ranged_attack_damage:int = 1,  entity_walkable:bool = false):
+		descriptor_tags:Array = [], ranged_attack_damage:int = 1, entity_color:Color = Color(1, 1, 1),
+		entity_walkable:bool = false):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
 	entity.position = _new_GetCoord.index_to_vector(x, y)
@@ -644,6 +736,7 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entity.energy_current = entity.energy_max
 	entity.damage = entity_damage
 	entity.ranged_damage = ranged_attack_damage
+	entity.modulate = entity_color
 	entity.walkable = entity_walkable
 	entity.alive = true
 	entity.move_type = movement_style
@@ -735,7 +828,7 @@ func end_player_turn():
 	update_fov(player)
 
 
-func roll_item(floor_num, vector_position:Vector2):
+func roll_item(floor_num:int, index_position:Vector2):
 	var random_roll:int = randi() % 5
 	var random_type_roll:int = randi() % 4
 	var coin_toss:int = randi() % 2
@@ -808,7 +901,73 @@ func roll_item(floor_num, vector_position:Vector2):
 			pass
 		
 	# Need to make scenes for items determined by 
-	create_item(vector_position.x, vector_position.y, item_scene, item_name, health, energy, [type], item_color)
+	create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, [type], item_color)
+
+
+# Number range is min:0, max:24
+func roll_enemy(floor_num:int, index_position:Vector2):
+	var rng:int
+	if floor_num < 5:
+		rng = randi() % 3 - 1
+	elif floor_num < 10:
+		rng = randi() % 5 - 2
+	elif floor_num < 15:
+		rng = randi() % 7 - 3
+	else:
+		rng = randi() % 9 - 4
+	match floor_num + rng:
+		0: # Weak scuttler
+			create_entity(index_position.x, index_position.y, _s_scene, "Scuttle Bug", 5, 4, 0, "AStar", ["Meat"], 0, Color(1, 0.5, 0))
+		1: # Weak Roomba with a knife
+			create_entity(index_position.x, index_position.y, _s_scene, "Sweeping Bot", 6, 3, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5))
+		2: # Basic Drone Enemy
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Maintenance Drone", 10, 5, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5))
+		3:
+			pass
+		4:
+			pass
+		5:
+			pass
+		6:
+			pass
+		7:
+			pass
+		8:
+			pass
+		9:
+			pass
+		10:
+			pass
+		11:
+			pass
+		12:
+			pass
+		13:
+			pass
+		14:
+			pass
+		15:
+			pass
+		16:
+			pass
+		17:
+			pass
+		18:
+			pass
+		19:
+			pass
+		20:
+			pass
+		21:
+			pass
+		22:
+			pass
+		23:
+			pass
+		24:
+			pass
+		
+	pass
 
 
 func astar_debug():
