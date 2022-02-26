@@ -8,10 +8,12 @@ var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
 var _d_lower_scene:PackedScene = preload("res://sprite/d_lower.tscn")
 var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
 var _s_scene:PackedScene = preload("res://sprite/s_lower.tscn")
+var _s_upper_scene:PackedScene = preload("res://sprite/s_upper.tscn")
 var _door_scene:PackedScene = preload("res://sprite/Door.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
+var _stairs_scene:PackedScene = preload("res://sprite/Stairs.tscn")
 
 var _plus_scene:PackedScene = preload("res://sprite/PlusSign.tscn")
 # Utilities
@@ -60,7 +62,7 @@ func _unhandled_input(Input):
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		text_out("Generating Map...")
-		create_entity(-1, -1, _player_scene, "player", 20, 5, 10, "Player", ["Meat"], 5)
+		create_entity(-1, -1, _player_scene, "Player", 20, 5, 10, "Player", ["Meat"], 5)
 		player = entities[0]
 		player.view_range = 3
 		player.ranged_attack_cost = 2
@@ -76,10 +78,24 @@ func _unhandled_input(Input):
 	
 	#Normal movement, melee attacking
 	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false):
-		if Input.is_action_pressed("select"):
-			pass
 		if Input.is_action_pressed("debug_key"):
-			astar_debug()
+			while entities.size() > 1:
+				get_parent().remove_child(entities[1])
+				entities.remove(1)
+		
+		if Input.is_action_pressed("enter"):
+			var new_map:bool = false
+			print(player.position)
+			for i in range(map.size()):
+				if new_map == true:
+					break
+				for j in range(map[i].size()):
+					if map[i][j].terrain_name == "Stairs" && map[i][j].position == player.position:
+						text_out("You descend the ladder to the next floor")
+						new_map = true
+						break
+			if new_map == true:
+				generate_map()
 		if Input.is_action_pressed("move_down"):
 			try_move(player, 0, 1)
 		if Input.is_action_pressed("move_up"):
@@ -152,7 +168,7 @@ func _unhandled_input(Input):
 					slot_number -= 1
 					update_inventory_panel(slot_number)
 			if Input.is_action_pressed("move_down"):
-				if slot_number < 9:
+				if slot_number < 11:
 					slot_number += 1
 					update_inventory_panel(slot_number)
 			if Input.is_action_pressed("enter"):
@@ -176,15 +192,33 @@ func _unhandled_input(Input):
 			inventory_mode = false
 
 func generate_map():
+	
+	# Floor number iterates, clean slate the arrays
+	floor_number += 1
+	# Preserve player as first entity
+	if floor_number > 1:
+		while entities.size() > 1:
+			get_parent().remove_child(entities[1])
+			entities.remove(1)
+		while map.size() > 0:
+			while map[0].size() > 0:
+				get_parent().remove_child(map[0][0])
+				map[0].remove(0)
+			map.remove(0)
+		while items.size() > 0:
+			get_parent().remove_child(items[0])
+			items.remove(0)
+		while objects.size() > 0:
+			get_parent().remove_child(objects[0])
+			objects.remove(0)
+		astar.clear()
+	
 	#Fill space with walls, populate the map array
 	for i in range(33):
 		map.append([])
 		for j in range(17):
 			var _wall = place_terrain(i, j, _wall_scene, "wall", false, true)
 			map[i].append(_wall)
-	
-	# Floor number iterates
-	floor_number += 1
 	
 	# Room Generation
 	room_list = []
@@ -485,7 +519,25 @@ func generate_map():
 						roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 						random_x = randi() % 3 - 1
 						random_y = randi() % 3 - 1
-		
+	
+	# Places stairs and clears the tile of the stairs of items and objects and prevents entities or objects starting on top of player
+	var stairs_index:Vector2 = Vector2(4 * room_list[room_list.size() - 1][0] + 2, 4 * room_list[room_list.size() - 1][1] + 2)
+	var stairs_location:Vector2 = _new_GetCoord.index_to_vector(4 * room_list[room_list.size() - 1][0] + 2, 4 * room_list[room_list.size() - 1][1] + 2)
+	for i in range(items.size() - 1, -1, -1):
+		if items[i].position == stairs_location:
+			get_parent().remove_child(items[i])
+			items.remove(i)
+	for i in range(objects.size() - 1, -1, -1):
+		if objects[i].position == stairs_location || objects[i].position == player.position:
+			get_parent().remove_child(objects[i])
+			objects.remove(i)
+	for i in range(entities.size() - 1, -1, -1):
+		if entities[i].position == player.position && entities[i] != player:
+			get_parent().remove_child(entities[i])
+			entities.remove(i)
+	
+	replace_terrain(stairs_index.x, stairs_index.y, _stairs_scene, "Stairs", true, false)
+	
 	for i in range(map.size()):
 		for j in range(map[i].size()):
 			map[i][j].visible = false
@@ -573,10 +625,26 @@ func try_object(object):
 		astar.set_point_disabled(object.astar_node, false)
 		if player_turn == true:
 			player_turn = false
+	if object.room_object_name == "Charging Station" && object.active == true:
+		var rand_roll:int = randi() % 4
+		if player.energy_current == player.energy_max:
+			text_out("Your energy is already at full.")
+		elif rand_roll > 0:
+			text_out("The charging station refills you energy and shuts down.")
+			player.energy_current = player.energy_max
+			object.active = false
+			object.modulate = Color(0.25, 0.25, 0.25)
+			update_status_screen()
+		else:
+			text_out("The charging station refills your energy.")
+			player.energy_current = player.energy_max
+			update_status_screen()
+		
 
 
 func use_item(item, entity):
 	for i in range(item.item_tags.size()):
+		# Restoratives and Buffs
 		if item.item_tags[i] == "restore":
 			entity.health_current += item.health
 			entity.energy_current += item.energy
@@ -585,12 +653,33 @@ func use_item(item, entity):
 			entity.health_max += item.health
 			entity.energy_current += item.energy
 			entity.energy_max += item.energy
-		# Prevent going over max, would "clamp" be better in this case?
+		if item.item_tags[i] == "damage_buff":
+			entity.damage += 1
+		# Prevent rstoration going over max
 		if entity.energy_current > entity.energy_max:
 			entity.energy_current = entity.energy_max
 		if entity.health_current > entity.health_max:
 			entity.health_current = entity.health_max
-
+		
+		# Corpse Scavenging
+		if item.item_tags[i] == "Meat":
+			var random_chance:int = randi() % 20
+			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+			if random_chance == 0:
+				text_out("As you pull apart the viscera, a warm lump falls from the corpse's innards.")
+				create_item(player_index.x, player_index.y, _o_scene, "Mutagenic Essence", 2, 0, ["increase", "damage_buff"], Color(0.7, 0, 0))
+			if random_chance > 0 && random_chance < 6:
+				text_out("As you dig through the viscera, a small lump falls from the corpse's innards.")
+				create_item(player_index.x, player_index.y, _o_scene, "Vital Essence", 2, 0, ["increase"], Color(1, 0, 0))
+		if item.item_tags[i] == "Tech":
+			var random_chance:int = randi() % 10
+			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+			if random_chance < 1:
+				text_out("As you pull an actuator from its socket, something clatters to the floor.")
+				create_item(player_index.x, player_index.y, _o_scene, "Small Capacitor", 0, 1, ["increase"], Color(0.5, 0.5, 1))
+			elif random_chance < 4:
+				text_out("As you pull on a bundle of wiring, something falls at your feet.")
+				create_item(player_index.x, player_index.y, _o_scene, "Micro Energy Cell", 0, 3, ["restore"], Color(0.5, 0.5, 1))
 
 func attack(attacker, defender, ranged:bool = false):
 	if ranged == false:
@@ -790,22 +879,20 @@ func create_corpse(entity):
 			break
 
 # Creates terrain pieces like fountains that will replace floor tiles after base map generation
-func create_room_object(x, y, object_scene:PackedScene, object_name:String, astar_node:int, blocks_vision:bool = true):
+func create_room_object(x, y, object_scene:PackedScene, object_name:String, astar_node:int, blocks_vision:bool = true, active:bool = true):
 	var room_object = object_scene.instance()
 	room_object.position = _new_GetCoord.index_to_vector(x, y)
 	room_object.room_object_name = object_name
 	room_object.blocks_vision = blocks_vision
 	room_object.astar_node = astar_node
+	room_object.active = active
 	astar.set_point_disabled(astar_node)
 	objects.append(room_object)
 	get_parent().add_child(room_object)
 	map[x][y].walkable = false
 
 # Determines pathfinding based on entity.move_type tag
-# ToDo - Coward - Flees from player
-# ToDo - Ambush - Waits until the player has interacted with it first
 # Astar - Most direct pursuit of player, sees doors as obstacles
-# ToDo - Roam - Wandering until player spotted, switch tag to AStar once seen
 # ToDo - Smart - Once player seen, takes more direct routes, factoring in door shortcuts, might require a second astar node array
 func movement_type(moving_entity):
 	if moving_entity.move_type == "AStar":
@@ -844,6 +931,7 @@ func roll_item(floor_num:int, index_position:Vector2):
 		3:
 			type = "increase"
 	
+	print(random_type_roll, ", ", type)
 	match floor_num + random_roll:
 		1, 2, 3, 4, 5:
 			if type == "restore":
