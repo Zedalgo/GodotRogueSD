@@ -14,7 +14,6 @@ var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
 var _fountain_scene:PackedScene = preload("res://sprite/Fountain.tscn")
 var _stairs_scene:PackedScene = preload("res://sprite/Stairs.tscn")
-
 var _plus_scene:PackedScene = preload("res://sprite/PlusSign.tscn")
 # Utilities
 var _new_GetCoord = preload("res://library/GetCoord.gd").new()
@@ -79,9 +78,8 @@ func _unhandled_input(Input):
 	#Normal movement, melee attacking
 	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false):
 		if Input.is_action_pressed("debug_key"):
-			while entities.size() > 1:
-				get_parent().remove_child(entities[1])
-				entities.remove(1)
+			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
+			create_item(player_index.x, player_index.y, _plus_scene, "debug Debug", 100, 100, ["increase"], Color(0.5, 0.5, 0))
 		
 		if Input.is_action_pressed("enter"):
 			var new_map:bool = false
@@ -190,6 +188,7 @@ func _unhandled_input(Input):
 		else:
 			text_out("There is nothing in your inventory.")
 			inventory_mode = false
+
 
 func generate_map():
 	
@@ -655,6 +654,8 @@ func use_item(item, entity):
 			entity.energy_max += item.energy
 		if item.item_tags[i] == "damage_buff":
 			entity.damage += 1
+		if item.item_tags[i] == "ranged_buff":
+			entity.ranged_damage += 1
 		# Prevent rstoration going over max
 		if entity.energy_current > entity.energy_max:
 			entity.energy_current = entity.energy_max
@@ -680,6 +681,7 @@ func use_item(item, entity):
 			elif random_chance < 4:
 				text_out("As you pull on a bundle of wiring, something falls at your feet.")
 				create_item(player_index.x, player_index.y, _o_scene, "Micro Energy Cell", 0, 3, ["restore"], Color(0.5, 0.5, 1))
+
 
 func attack(attacker, defender, ranged:bool = false):
 	if ranged == false:
@@ -709,6 +711,7 @@ func update_status_screen():
 	$HealthBar.value = player.health_current
 	$EnergyBar.max_value = player.energy_max
 	$EnergyBar.value = player.energy_current
+	$StatusNumbers.text = "Melee Damage: %s\nRanged Damage: %s" % [player.damage, player.ranged_damage]
 	$TurnTracker.text = "Floor Number: %s\nTurn: %s" % [floor_number, turn_number]
 	$StatusScreen.text = "%s%s%s\n%s%s%s" % [player.health_current, "/", player.health_max , player.energy_current, "/", player.energy_max]
 
@@ -905,9 +908,9 @@ func movement_type(moving_entity):
 
 func end_player_turn():
 	turn_number += 1
-	# Heal back 1 health every ten turns
+	# Heal back 1% health every 10 turns (minimum of 1 health)
 	if (player.health_current < player.health_max) && (turn_number % 10 == 0):
-		player.health_current += 1
+		player.health_current += round(clamp((player.health_max / 100), 1, 100))
 	update_inventory_panel(-1)
 	update_status_screen()
 	create_corpses()
@@ -920,23 +923,22 @@ func roll_item(floor_num:int, index_position:Vector2):
 	var random_type_roll:int = randi() % 4
 	var coin_toss:int = randi() % 2
 	var item_name:String = "AnErrorHasOccurred"
-	var type:String
+	var type:Array = []
 	var health:int = 0
 	var energy:int = 0
 	var item_scene:PackedScene = _o_scene
 	var item_color:Color = Color(1, 1, 1)
 	match random_type_roll:
 		0, 1, 2:
-			type = "restore"
+			type.append("restore")
 		3:
-			type = "increase"
+			type.append("increase")
 	
-	print(random_type_roll, ", ", type)
 	match floor_num + random_roll:
 		1, 2, 3, 4, 5:
-			if type == "restore":
+			if type[0] == "restore":
 				if coin_toss == 0:
-					health = 8
+					health = 6
 					item_name = "Small Medical Hypo"
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
@@ -945,51 +947,163 @@ func roll_item(floor_num:int, index_position:Vector2):
 					item_name = "Small Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0.5, 0.5, 1)
-			if type == "increase":
+			if type[0] == "increase":
 				if coin_toss == 0:
 					health = 1
-					item_name = "Glowing Medical Hypo"
+					item_name = "Glowing Hypo"
 					item_scene = _plus_scene
 					item_color = Color(1, 0.5, 0.5)
 				elif coin_toss == 1:
-					energy = 1
-					item_name = "Small Energy Capacitor"
+					energy = 2
+					item_name = "Small Capacitor"
 					item_scene = _o_scene
 					item_color = Color(0.25, 0.25, 1)
 		6, 7, 8, 9, 10:
-			if type == "restore":
+			if type[0] == "restore":
 				if coin_toss == 0:
-					health = 16
+					health = 12
 					item_name = "Medical Hypo"
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
 					energy = 10
-					item_name = "Energy Cell"
+					item_name = "Medium Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0.5, 0.5, 1)
-			if type == "increase":
+			if type[0] == "increase":
 				if coin_toss == 0:
-					health = 2
-					item_name = "Large Glowing Medical Hypo"
+					health = 3
+					item_name = "Large Glowing Hypo"
 					item_scene = _plus_scene
 					item_color = Color(1, 0.5, 0.5)
 				elif coin_toss == 1:
-					energy = 1
-					item_name = "Energy Capacitor"
+					energy = 4
+					item_name = "Large Capacitor"
 					item_scene = _o_scene
 					item_color = Color(0.25, 0.25, 1)
 		11, 12, 13, 14, 15:
-			pass
-		16, 17, 18, 19, 20:
-			pass
+			if type[0] == "restore":
+				if coin_toss == 0:
+					health = 18
+					item_name = "Medical Kit"
+					item_scene = _plus_scene
+					item_color = Color(1, 0, 0)
+				elif coin_toss == 1:
+					energy = 15
+					item_name = "Large Energy Cell"
+					item_scene = _o_scene
+					item_color = Color(0.5, 0.5, 1)
+			if type[0] == "increase":
+				if coin_toss == 0:
+					health = (randi() % 3 - 1) * 3
+					if health > -1:
+						type.append("damage_buff")
+					item_name = "Experimental Hypo"
+					item_scene = _plus_scene
+					item_color = Color(1, 0.25, 0)
+				elif coin_toss == 1:
+					var second_coin_toss:int = randi() % 2
+					if second_coin_toss == 0:
+						energy = (randi() % 3 - 1) * 4
+						if energy > -1:
+							type.append("ranged_buff")
+						item_name = "Experimental Capacitor"
+						item_scene = _o_scene
+						item_color = Color(0, 1, 1)
+		16, 17, 18, 19, 20: # Bookmark
+			if type[0] == "restore":
+				if coin_toss == 0:
+					health = 24
+					item_name = "Large Medical Kit"
+					item_scene = _plus_scene
+					item_color = Color(1, 0, 0)
+				elif coin_toss == 1:
+					energy = 25
+					item_name = "Massive Energy Cell"
+					item_scene = _o_scene
+					item_color = Color(0, 1, 1)
+			if type[0] == "increase":
+				if coin_toss == 0:
+					health = (randi() % 7 - 3) * 3
+					if health > -1:
+						type.append("damage_buff")
+					item_name = "Experimental Treatment"
+					item_scene = _plus_scene
+					item_color = Color(1, 0.5, 0.5)
+				elif coin_toss == 1:
+					var second_coin_toss:int = randi() % 2
+					if second_coin_toss == 0:
+						energy = (randi() % 9 - 4) * 2
+						if energy > -1:
+							type.append("ranged_buff")
+							type.append("ranged_buff")
+						item_name = "Unstable Capacitor"
+						item_scene = _o_scene
+						item_color = Color(0.75, 0.75, 1)
 		21, 22:
-			pass
-		23, 24:
-			pass
-		
-	# Need to make scenes for items determined by 
-	create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, [type], item_color)
+			if type[0] == "restore":
+				if coin_toss == 0:
+					health = 100
+					item_name = "Regenerative Nanobot Capsule"
+					item_scene = _plus_scene
+					item_color = Color(1, 0, 0)
+				elif coin_toss == 1:
+					energy = 100
+					item_name = "Single-Burn Energy Cell"
+					item_scene = _o_scene
+					item_color = Color(0, 1, 1)
+			if type[0] == "increase":
+				if coin_toss == 0:
+					health = (randi() % 7 - 1) * 3
+					if health > -1:
+						type.append("damage_buff")
+					item_name = "Stable Experimental Treatment"
+					item_scene = _plus_scene
+					item_color = Color(1, 0.5, 0.5)
+				elif coin_toss == 1:
+					var second_coin_toss:int = randi() % 2
+					if second_coin_toss == 0:
+						energy = (randi() % 9 - 1) * 2
+						if energy > -1:
+							type.append("ranged_buff")
+							type.append("ranged_buff")
+						item_name = "Stabilized Experimental Capacitor"
+						item_scene = _o_scene
+						item_color = Color(0.75, 0.75, 1)
+		23, 24: #  Very rare, but likely run guaranteeing at floor 19/20
+			var low_odds:int = randi() % 100
+			if low_odds == 0:
+				if type[0] == "restore":
+					if coin_toss == 0:
+						health = 24
+						item_name = ""
+						item_scene = _plus_scene
+						item_color = Color(1, 0, 0)
+					elif coin_toss == 1:
+						energy = 25
+						item_name = "Massive Energy Cell"
+						item_scene = _o_scene
+						item_color = Color(0, 1, 1)
+				if type[0] == "increase":
+					if coin_toss == 0:
+						health = (randi() % 7 - 3) * 3
+						if health > -1:
+							type.append("damage_buff")
+						item_name = "Experimental Treatment"
+						item_scene = _plus_scene
+						item_color = Color(1, 0.5, 0.5)
+					elif coin_toss == 1:
+						var second_coin_toss:int = randi() % 2
+						if second_coin_toss == 0:
+							energy = (randi() % 9 - 4) * 2
+							if energy > -1:
+								type.append("ranged_buff")
+								type.append("ranged_buff")
+							item_name = "Unstable Capacitor"
+							item_scene = _o_scene
+							item_color = Color(0.75, 0.75, 1)
+	
+	create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, type, item_color)
 
 
 # Number range is min:0, max:24
