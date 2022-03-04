@@ -20,7 +20,8 @@ margin_left = 169.0
 margin_top = 192.0
 margin_right = 356.0
 margin_bottom = 206.0
-text = "Press Space to Generate Map"
+text = "Press Space to Start"
+align = 1
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -30,6 +31,8 @@ points = PoolVector2Array( 800, 410, 0, 410 )
 default_color = Color( 1, 1, 1, 1 )
 
 [node name="Line2D2" type="Line2D" parent="."]
+position = Vector2( 0, -3.17742 )
+scale = Vector2( 1, 0.682258 )
 points = PoolVector2Array( 533, 0, 533, 600 )
 default_color = Color( 1, 1, 1, 1 )
 
@@ -40,7 +43,7 @@ default_color = Color( 1, 1, 1, 1 )
 [node name="Text_Log" type="RichTextLabel" parent="."]
 margin_left = 2.0
 margin_top = 417.0
-margin_right = 526.0
+margin_right = 798.0
 margin_bottom = 598.0
 custom_fonts/mono_font = SubResource( 1 )
 __meta__ = {
@@ -65,8 +68,8 @@ margin_top = 165.0
 margin_right = 766.0
 margin_bottom = 200.0
 custom_fonts/mono_font = SubResource( 1 )
-text = "Floor 1
-Turn: 33"
+text = "Floor #
+Turn: ##"
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -77,8 +80,8 @@ margin_top = 34.0
 margin_right = 765.0
 margin_bottom = 159.0
 custom_fonts/mono_font = SubResource( 1 )
-text = "Melee Damage: #
-Ranged Damage #"
+text = "Melee Attack Damage: #
+Ranged Attack Damage: #"
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -113,7 +116,20 @@ __meta__ = {
 margin_left = 540.0
 margin_top = 207.0
 margin_right = 798.0
-margin_bottom = 598.0
+margin_bottom = 415.0
+text = "Inventory
+1)
+2)
+3)
+4)
+5)
+6)
+7)
+8)
+9)
+10)
+11)
+12)"
 __meta__ = {
 "_edit_use_anchors_": false
 }

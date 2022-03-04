@@ -1,14 +1,24 @@
 extends Node2D
 
+var score_file = "user://score.save"
+
 var white_pixel:PackedScene = preload("res://sprite/WhitePixel.tscn")
 # Sprite scenes
 var _floor_scene:PackedScene = preload("res://sprite/Floor.tscn")
 var _wall_scene:PackedScene = preload("res://sprite/Wall.tscn")
 var _player_scene:PackedScene = preload("res://sprite/Player.tscn")
+var _b_lower:PackedScene = preload("res://sprite/b_lower.tscn")
+var _b_upper:PackedScene = preload("res://sprite/b_upper.tscn")
+var _c_lower:PackedScene = preload("res://sprite/c_lower.tscn")
 var _d_lower_scene:PackedScene = preload("res://sprite/d_lower.tscn")
+var _d_upper:PackedScene = preload("res://sprite/d_upper.tscn")
+var _n_upper:PackedScene = preload("res://sprite/n_upper.tscn")
 var _o_scene:PackedScene = preload("res://sprite/o_lower.tscn")
+var _o_entity:PackedScene = preload("res://sprite/o_lower_entity.tscn")
+var _o_upper:PackedScene = preload("res://sprite/o_upper.tscn")
 var _s_scene:PackedScene = preload("res://sprite/s_lower.tscn")
 var _s_upper_scene:PackedScene = preload("res://sprite/s_upper.tscn")
+var _w_upper:PackedScene = preload("res://sprite/w_upper.tscn")
 var _door_scene:PackedScene = preload("res://sprite/Door.tscn")
 var _corpse_scene:PackedScene = preload("res://sprite/Corpse.tscn")
 var _chest_scene:PackedScene = preload("res://sprite/Chest.tscn")
@@ -31,6 +41,7 @@ var map:Array = []
 var objects:Array = []
 var room_list:Array = []
 # Booleans
+var died_message:bool = false
 var map_generated:bool = false
 var player_turn:bool = true
 var shoot_mode:bool = false
@@ -38,11 +49,12 @@ var inventory_mode:bool = false
 # Constants
 # Integers
 var floor_number:int = 0
+var highscore:int
+var score:int = 0
 var slot_number:int = 0 # Used for item selection in use_mode
 var tile_width:int = 16
 var tile_height:int = 24
 var turn_number:int = 0
-# Update floor tiles after LoS, or floor will be visible under sprites
 
 
 ##### To Do After Basic Gameplay#####
@@ -58,6 +70,9 @@ func _ready():
 func _unhandled_input(Input):
 	# Handles start screen input (space to start)
 	if Input.is_action_pressed("start_game") && map_generated == false:
+		
+		load_score()
+		
 		$SpaceToGenMap.visible = false
 		map_generated = true
 		text_out("Generating Map...")
@@ -80,7 +95,9 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("debug_key"):
 			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
 			create_item(player_index.x, player_index.y, _plus_scene, "debug Debug", 100, 100, ["increase"], Color(0.5, 0.5, 0))
-		
+			astar_debug()
+			for i in range(objects.size()):
+				objects[i].visible = false
 		if Input.is_action_pressed("enter"):
 			var new_map:bool = false
 			print(player.position)
@@ -165,9 +182,15 @@ func _unhandled_input(Input):
 				if slot_number > 0:
 					slot_number -= 1
 					update_inventory_panel(slot_number)
+				else:
+					slot_number = inventory.size() - 1
+					update_inventory_panel(slot_number)
 			if Input.is_action_pressed("move_down"):
-				if slot_number < 11:
+				if slot_number < inventory.size() - 1:
 					slot_number += 1
+					update_inventory_panel(slot_number)
+				else:
+					slot_number = 0
 					update_inventory_panel(slot_number)
 			if Input.is_action_pressed("enter"):
 				if slot_number < inventory.size():
@@ -217,6 +240,14 @@ func generate_map():
 		map.append([])
 		for j in range(17):
 			var _wall = place_terrain(i, j, _wall_scene, "wall", false, true)
+			if floor_number <= 5:
+				_wall.modulate = Color(1, 1, 1)
+			elif floor_number <= 10:
+				_wall.modulate = Color(0.5, 0.5, 1)
+			elif floor_number <= 15:
+				_wall.modulate = Color(1, 0.5, 0)
+			else:
+				_wall.modulate = Color(1, 0.25, 0.25)
 			map[i].append(_wall)
 	
 	# Room Generation
@@ -366,21 +397,38 @@ func generate_map():
 		var room_map_y:int = (4*room_list[i][1]) + 2
 		var room_number:int = room_list[i][2]
 		var same_room:bool = false
+		var door_there:bool
 		if room_list[i][0] < 7:# Check Right wall if not in right column
+			door_there = false
+			for a in range(objects.size()):
+				if objects[a].position == _new_GetCoord.index_to_vector(room_map_x + 2, room_map_y):
+					door_there = true
 			if map[room_map_x + 2][room_map_y].terrain_name == "floor":
-				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall":
+				if map[room_map_x + 2][room_map_y + 1].terrain_name == "wall" && door_there == false:
 					create_room_object(room_map_x + 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x + 2][room_map_y].position))
 		if room_list[i][0] > 0:# Check Left Wall if not in left column
+			door_there = false
+			for a in range(objects.size()):
+				if objects[a].position == _new_GetCoord.index_to_vector(room_map_x - 2, room_map_y):
+					door_there = true
 			if map[room_map_x - 2][room_map_y].terrain_name == "floor":
-				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall":
+				if map[room_map_x - 2][room_map_y + 1].terrain_name == "wall" && door_there == false:
 					create_room_object(room_map_x - 2, room_map_y, _door_scene, "door", astar.get_closest_point(map[room_map_x - 2][room_map_y].position))
 		if room_list[i][1] < 3:# Check Bottom Wall if not in bottom row
+			door_there = false
+			for a in range(objects.size()):
+				if objects[a].position == _new_GetCoord.index_to_vector(room_map_x, room_map_y + 2):
+					door_there = true
 			if map[room_map_x][room_map_y + 2].terrain_name == "floor":
-				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall":
+				if map[room_map_x + 1][room_map_y + 2].terrain_name == "wall" && door_there == false:
 					create_room_object(room_map_x, room_map_y + 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y + 2].position))
 		if room_list[i][1] > 0:#Check top Wall if not in top row
+			door_there = false
+			for a in range(objects.size()):
+				if objects[a].position == _new_GetCoord.index_to_vector(room_map_x, room_map_y - 2):
+					door_there = true
 			if map[room_map_x][room_map_y - 2].terrain_name == "floor":
-				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall":
+				if map[room_map_x + 1][room_map_y - 2].terrain_name == "wall" && door_there == false:
 					create_room_object(room_map_x, room_map_y - 2, _door_scene, "door", astar.get_closest_point(map[room_map_x][room_map_y - 2].position))
 	
 	# Places player, enemies, items and room objects randomly in rooms
@@ -399,19 +447,24 @@ func generate_map():
 		var occupied_tiles:Array = []
 		var overlap:bool = false
 		
+		var scarcity_benchmark:int = (floor_number % 5) - 1
+		var scarcity_var:int = randi() % 5 + 1
+		# Makes items get more scarce as you approach each multiple of 5 (5, 10, 15, 20)
 		
 		match random_roll:
 			0: # Rolled Nothing
 				pass
 				
 			1: # 1 item
-				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 				
 			2: # 1 enemy
 				roll_enemy(floor_number, occupied_index)
 				
 			3: # 1 item, 1 enemy
-				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
@@ -431,22 +484,28 @@ func generate_map():
 				roll_enemy(floor_number, occupied_index)
 				
 			5: # 2 items, 1 enemy
-				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
-				roll_item(floor_number, occupied_index)
+				scarcity_var = randi() % 5 + 1
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, occupied_index)
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
 				roll_enemy(floor_number, occupied_index)
 				
 			6: # 2 items, 2 enemies
-				roll_item(floor_number, occupied_index)
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, occupied_index)
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
-				roll_item(floor_number, occupied_index)
+				scarcity_var = randi() % 5 + 1
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, occupied_index)
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
@@ -463,7 +522,8 @@ func generate_map():
 				roll_enemy(floor_number, occupied_index)
 				
 			7: # 1 enemy, item, and room object
-				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
@@ -479,7 +539,9 @@ func generate_map():
 					elif _new_GetCoord.index_to_vector(occupied_index.x - 1, occupied_index.y) == objects[a].position:
 						door_check_passed = false
 				if door_check_passed == true:
-					create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
+					var reduce_number:int = randi() % 2
+					if reduce_number == 0:
+						create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				if room_vector_coords.x + random_x == occupied_index.x && room_vector_coords.y + random_y == occupied_index.y:
@@ -492,7 +554,8 @@ func generate_map():
 				roll_enemy(floor_number, occupied_index)
 				
 			8: #  1 item and room object
-				roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+				if scarcity_var > scarcity_benchmark:
+					roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 				random_x = randi() % 3 - 1
 				random_y = randi() % 3 - 1
 				occupied_index = Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y)
@@ -508,16 +571,20 @@ func generate_map():
 					elif _new_GetCoord.index_to_vector(occupied_index.x - 1, occupied_index.y) == objects[a].position:
 						door_check_passed = false
 				if door_check_passed == true:
-					create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
+					var reduce_number:int = randi() % 2
+					if reduce_number == 0:
+						create_room_object(occupied_index.x, occupied_index.y, _fountain_scene, "Charging Station", astar.get_closest_point(_new_GetCoord.index_to_vector(occupied_index.x, occupied_index.y)))
 				
 			9: # Empty or Loot Room
 				var chance:int = randi() % 10
 				var lootcount:int = randi() % 3 + 3
 				if chance == 0:
 					for a in range(lootcount):
-						roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
+						if scarcity_var > scarcity_benchmark:
+							roll_item(floor_number, Vector2(room_vector_coords.x + random_x, room_vector_coords.y + random_y))
 						random_x = randi() % 3 - 1
 						random_y = randi() % 3 - 1
+						scarcity_var = randi() % 5 + 1
 	
 	# Places stairs and clears the tile of the stairs of items and objects and prevents entities or objects starting on top of player
 	var stairs_index:Vector2 = Vector2(4 * room_list[room_list.size() - 1][0] + 2, 4 * room_list[room_list.size() - 1][1] + 2)
@@ -638,7 +705,6 @@ func try_object(object):
 			text_out("The charging station refills your energy.")
 			player.energy_current = player.energy_max
 			update_status_screen()
-		
 
 
 func use_item(item, entity):
@@ -669,9 +735,11 @@ func use_item(item, entity):
 			if random_chance == 0:
 				text_out("As you pull apart the viscera, a warm lump falls from the corpse's innards.")
 				create_item(player_index.x, player_index.y, _o_scene, "Mutagenic Essence", 2, 0, ["increase", "damage_buff"], Color(0.7, 0, 0))
-			if random_chance > 0 && random_chance < 6:
+			elif random_chance > 0 && random_chance < 6:
 				text_out("As you dig through the viscera, a small lump falls from the corpse's innards.")
 				create_item(player_index.x, player_index.y, _o_scene, "Vital Essence", 2, 0, ["increase"], Color(1, 0, 0))
+			else:
+				text_out("You find nothing useful on the corpse.")
 		if item.item_tags[i] == "Tech":
 			var random_chance:int = randi() % 10
 			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
@@ -681,6 +749,8 @@ func use_item(item, entity):
 			elif random_chance < 4:
 				text_out("As you pull on a bundle of wiring, something falls at your feet.")
 				create_item(player_index.x, player_index.y, _o_scene, "Micro Energy Cell", 0, 3, ["restore"], Color(0.5, 0.5, 1))
+			else:
+				text_out("You find nothing useful in the scrap.")
 
 
 func attack(attacker, defender, ranged:bool = false):
@@ -695,14 +765,16 @@ func attack(attacker, defender, ranged:bool = false):
 	if defender.health_current <= 0:
 		defender.alive = false
 		defender.walkable = true
+		score += defender.score
 
 
 func enemy_phase():
 	for i in range(1, entities.size()): 
-		if entities[i].alive == true:
+		if entities[i].alive == true && player.alive == true:
 			movement_type(entities[i])
 	create_corpses()
 	update_status_screen()
+	check_player_alive()
 	player_turn = true
 
 
@@ -711,7 +783,10 @@ func update_status_screen():
 	$HealthBar.value = player.health_current
 	$EnergyBar.max_value = player.energy_max
 	$EnergyBar.value = player.energy_current
-	$StatusNumbers.text = "Melee Damage: %s\nRanged Damage: %s" % [player.damage, player.ranged_damage]
+	if score <= highscore:
+		$StatusNumbers.text = "Melee Attack Damage: %s\nRanged Attack Damage: %s\n\n\nHighscore: %s\nScore: %s" % [player.damage, player.ranged_damage, highscore, score]
+	else:
+		$StatusNumbers.text = "Melee Attack Damage: %s\nRanged Attack Damage: %s\n\n\n!!Highscore: %s!!\nScore: %s" % [player.damage, player.ranged_damage, score, score]
 	$TurnTracker.text = "Floor Number: %s\nTurn: %s" % [floor_number, turn_number]
 	$StatusScreen.text = "%s%s%s\n%s%s%s" % [player.health_current, "/", player.health_max , player.energy_current, "/", player.energy_max]
 
@@ -721,12 +796,12 @@ func update_inventory_panel(inventory_slot_num):
 	var empty_slot_number:int = 12 - inventory.size()
 	for i in range(inventory.size()):
 		if inventory_slot_num == i:
+			$InventoryScreen.push_color(inventory[i].modulate)
 			$InventoryScreen.text = "%s>%s) %s<\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
 		else:
 			$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
 	for i in range(empty_slot_number):
 		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size() + 1)]
-
 
 # Reveals tiles on player view and dims visited tiles outside it
 # Setting up to be usable for enemy LoS as well, hopefully
@@ -817,7 +892,7 @@ func replace_terrain(index_x, index_y, terrain_scene:PackedScene, terrain_name:S
 # Creates a creature with stats, some form of movement type, and optional tags
 func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_health:int,
 		entity_damage:int, entity_energy_max:int = 0, movement_style:String = "AStar",
-		descriptor_tags:Array = [], ranged_attack_damage:int = 1, entity_color:Color = Color(1, 1, 1),
+		descriptor_tags:Array = [], ranged_attack_damage:int = 1, entity_color:Color = Color(1, 1, 1), score_value:int = 0,
 		entity_walkable:bool = false):
 	var entity = entity_scene.instance()
 	entity.entity_name = entity_name
@@ -832,6 +907,7 @@ func create_entity(x, y, entity_scene:PackedScene, entity_name:String, entity_he
 	entity.walkable = entity_walkable
 	entity.alive = true
 	entity.move_type = movement_style
+	entity.score = score_value
 	entity.tags = descriptor_tags
 	entity.z_index = 1
 	get_parent().add_child(entity)
@@ -896,7 +972,6 @@ func create_room_object(x, y, object_scene:PackedScene, object_name:String, asta
 
 # Determines pathfinding based on entity.move_type tag
 # Astar - Most direct pursuit of player, sees doors as obstacles
-# ToDo - Smart - Once player seen, takes more direct routes, factoring in door shortcuts, might require a second astar node array
 func movement_type(moving_entity):
 	if moving_entity.move_type == "AStar":
 		var path_to_player:Array = astar.get_point_path(astar.get_closest_point(moving_entity.position), astar.get_closest_point(player.position))
@@ -916,6 +991,7 @@ func end_player_turn():
 	create_corpses()
 	enemy_phase()
 	update_fov(player)
+	check_player_alive()
 
 
 func roll_item(floor_num:int, index_position:Vector2):
@@ -1010,7 +1086,7 @@ func roll_item(floor_num:int, index_position:Vector2):
 						item_name = "Experimental Capacitor"
 						item_scene = _o_scene
 						item_color = Color(0, 1, 1)
-		16, 17, 18, 19, 20: # Bookmark
+		16, 17, 18, 19, 20:
 			if type[0] == "restore":
 				if coin_toss == 0:
 					health = 24
@@ -1070,41 +1146,10 @@ func roll_item(floor_num:int, index_position:Vector2):
 						item_name = "Stabilized Experimental Capacitor"
 						item_scene = _o_scene
 						item_color = Color(0.75, 0.75, 1)
-		23, 24: #  Very rare, but likely run guaranteeing at floor 19/20
-			var low_odds:int = randi() % 100
-			if low_odds == 0:
-				if type[0] == "restore":
-					if coin_toss == 0:
-						health = 24
-						item_name = ""
-						item_scene = _plus_scene
-						item_color = Color(1, 0, 0)
-					elif coin_toss == 1:
-						energy = 25
-						item_name = "Massive Energy Cell"
-						item_scene = _o_scene
-						item_color = Color(0, 1, 1)
-				if type[0] == "increase":
-					if coin_toss == 0:
-						health = (randi() % 7 - 3) * 3
-						if health > -1:
-							type.append("damage_buff")
-						item_name = "Experimental Treatment"
-						item_scene = _plus_scene
-						item_color = Color(1, 0.5, 0.5)
-					elif coin_toss == 1:
-						var second_coin_toss:int = randi() % 2
-						if second_coin_toss == 0:
-							energy = (randi() % 9 - 4) * 2
-							if energy > -1:
-								type.append("ranged_buff")
-								type.append("ranged_buff")
-							item_name = "Unstable Capacitor"
-							item_scene = _o_scene
-							item_color = Color(0.75, 0.75, 1)
+		23, 24:
+			pass
 	
 	create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, type, item_color)
-
 
 # Number range is min:0, max:24
 func roll_enemy(floor_num:int, index_position:Vector2):
@@ -1119,56 +1164,87 @@ func roll_enemy(floor_num:int, index_position:Vector2):
 		rng = randi() % 9 - 4
 	match floor_num + rng:
 		0: # Weak scuttler
-			create_entity(index_position.x, index_position.y, _s_scene, "Scuttle Bug", 5, 4, 0, "AStar", ["Meat"], 0, Color(1, 0.5, 0))
+			create_entity(index_position.x, index_position.y, _s_scene, "Scuttle Bug", 5, 4, 0, "AStar", ["Meat"], 0, Color(1, 0.5, 0), 50)
 		1: # Weak Roomba with a knife
-			create_entity(index_position.x, index_position.y, _s_scene, "Sweeping Bot", 6, 3, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5))
+			create_entity(index_position.x, index_position.y, _s_scene, "Sweeping Bot", 6, 3, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5), 75)
 		2: # Basic Drone Enemy
-			create_entity(index_position.x, index_position.y, _d_lower_scene, "Maintenance Drone", 10, 5, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5))
-		3:
-			pass
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Cleaning Drone", 10, 5, 0, "AStar", ["Machine"], 0, Color(0.75, 0.75, 0.75), 100)
+		3: # Small Mutated Mass
+			create_entity(index_position.x, index_position.y, _o_entity, "Small Lump", 15, 4, 0, "AStar", ["Meat"], 0, Color(1, 0.25, 0.5), 125)
 		4:
-			pass
+			create_entity(index_position.x, index_position.y, _s_upper_scene, "Slithering Beast", 12, 5, 0, "AStar", ["Meat"], 0, Color(0.75, 0.25, 0), 150)
 		5:
-			pass
+			create_entity(index_position.x, index_position.y, _o_upper, "Flesh Mound", 20, 3, 0, "AStar", ["Meat"], 0, Color(1, 0.5, 0), 175)
 		6:
-			pass
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Delivery Drone", 12, 6, 0, "AStar", ["Machine"], 0, Color(0.8, 0.7, 0.3), 200)
 		7:
-			pass
-		8:
-			pass
-		9:
-			pass
+			create_entity(index_position.x, index_position.y, _b_lower, "Cargo Bot", 18, 5, 0, "AStar", ["Machine"], 0, Color(0.7, 0.6, 0.3), 225)
+		8: # Haywire Medical Drone
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Medical Drone", 18, 7, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 1), 250)
+		9: # Writhing mass of flesh
+			create_entity(index_position.x, index_position.y, _o_entity, "Writhing Mass", 22, 6, 0, "AStar", ["Meat"], 0, Color(1, 0.25, 0), 275)
 		10:
-			pass
-		11:
-			pass
+			create_entity(index_position.x, index_position.y, _c_lower, "Reanimated Crewman", 15, 7, 0, "AStar", ["Meat"], 0, Color(0.6, 0.7, 0.3), 300)
+		11: # ND
+			create_entity(index_position.x, index_position.y, _c_lower, "Rotting Crewman", 11, 6, 0, "AStar", ["Meat"], 0, Color(0.4, 0.5, 0.1), 325)
 		12:
-			pass
-		13:
-			pass
-		14:
-			pass
+			create_entity(index_position.x, index_position.y, _b_upper, "Heavy Cargo Bot", 20, 7, 0, "AStar", ["Machine"], 0, Color(0.5, 0.5, 0.5), 350)
+		13: # Haywire Maintenance Drone
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Maintenance Drone", 20, 9, 0, "AStar", ["Machine"], 0, Color(1, 0.5, 0), 375)
+		14: # Lumbering mass of flesh
+			create_entity(index_position.x, index_position.y, _o_upper, "Lumbering Mass", 25, 8, 0, "AStar", ["Meat"], 0, Color(1, 0, 0.5), 400)
 		15:
-			pass
+			create_entity(index_position.x, index_position.y, _d_upper, "Bulky Maintenance Drone", 25, 9, 0, "AStar", ["Machine"], 0, Color(0.8, 0.4, 0), 425)
 		16:
-			pass
+			create_entity(index_position.x, index_position.y, _c_lower, "Mutating Crewman", 20, 9, 0, "AStar", ["Meat"], 0, Color(0.5, 0.25, 0.5), 450)
 		17:
-			pass
+			create_entity(index_position.x, index_position.y, _b_lower, "Freight Bot", 25, 9, 0, "AStar", ["Machine"], 0, Color(0.7, 0.6, 0.3), 475)
 		18:
-			pass
-		19:
-			pass
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Security Drone", 25, 11, 0, "AStar", ["Machine"], 0, Color(0.8, 0, 0), 500)
+		19: # Hulking Mass of flesh
+			create_entity(index_position.x, index_position.y, _o_upper, "Hulking Growth", 30, 10, 0, "AStar", ["Meat"], 0, Color(0.6, 0, 0.5), 525)
 		20:
-			pass
+			create_entity(index_position.x, index_position.y, _s_upper_scene, "Overgrown Scuttle Bug", 15, 7, 0, "AStar", ["Machine"], 0, Color(1, 0.5, 0), 550)
 		21:
-			pass
+			create_entity(index_position.x, index_position.y, _d_lower_scene, "Riot Drone", 30, 12, 0, "AStar", ["Machine"], 0, Color(0.9, 0, 0), 575)
 		22:
-			pass
-		23:
-			pass
-		24:
-			pass
+			create_entity(index_position.x, index_position.y, _b_upper, "Heavy Freight Bot", 35, 11, 0, "AStar", ["Machine"], 0, Color(0.7, 0.6, 0.3), 600)
+		23: # Peak drone
+			create_entity(index_position.x, index_position.y, _w_upper, "Half-assembled War Drone", 50, 13, 0, "AStar", ["Machine"], 0, Color(0.9, 0.5, 0.5), 625)
+		24: # Peak mass of flesh
+			create_entity(index_position.x, index_position.y, _b_upper, "Hulking Beast", 55, 12, 0, "AStar", ["Meat"], 0, Color(0.5, 0, 0.5), 650)
 		
+	pass
+
+
+func save_highscore():
+	var file = File.new()
+	file.open(score_file, File.WRITE)
+	file.store_var(highscore)
+	file.close()
+
+
+func load_score():
+	var file = File.new()
+	if file.file_exists(score_file):
+		file.open(score_file, File.READ)
+		highscore = file.get_var()
+		file.close()
+	else:
+		highscore = 0
+
+
+func check_player_alive():
+	if player.alive == false && died_message == false:
+		text_out("You have died!")
+		died_message = true
+		if score > highscore:
+			text_out("New Highscore!\n%s -> %s" % [highscore, score])
+			highscore = score
+			save_highscore()
+
+
+func win_game():
 	pass
 
 
