@@ -17,9 +17,9 @@ script = ExtResource( 1 )
 
 [node name="SpaceToGenMap" type="Label" parent="."]
 margin_left = 169.0
-margin_top = 192.0
+margin_top = 188.0
 margin_right = 356.0
-margin_bottom = 206.0
+margin_bottom = 235.0
 text = "Press Space to Start"
 align = 1
 __meta__ = {
@@ -31,8 +31,7 @@ points = PoolVector2Array( 800, 410, 0, 410 )
 default_color = Color( 1, 1, 1, 1 )
 
 [node name="Line2D2" type="Line2D" parent="."]
-position = Vector2( 0, -3.17742 )
-scale = Vector2( 1, 0.682258 )
+position = Vector2( 0, -2.38419e-07 )
 points = PoolVector2Array( 533, 0, 533, 600 )
 default_color = Color( 1, 1, 1, 1 )
 
@@ -42,10 +41,41 @@ default_color = Color( 1, 1, 1, 1 )
 
 [node name="Text_Log" type="RichTextLabel" parent="."]
 margin_left = 2.0
-margin_top = 417.0
-margin_right = 798.0
+margin_top = 416.0
+margin_right = 526.0
 margin_bottom = 598.0
 custom_fonts/mono_font = SubResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Text_Log2" type="RichTextLabel" parent="."]
+margin_left = 546.0
+margin_top = 423.0
+margin_right = 792.0
+margin_bottom = 598.0
+custom_fonts/mono_font = SubResource( 1 )
+bbcode_enabled = true
+bbcode_text = "Controls:
+
+Move: Arrow Keys
+Inventory: Number Keys
+[u]G[/u]et
+[u]A[/u]im
+Shoot/Use Stairs: Enter
+Cancel: Esc
+
+Game still needs to be reopened between runs, sorry"
+text = "Controls:
+
+Move: Arrow Keys
+Inventory: Number Keys
+Get
+Aim
+Shoot/Use Stairs: Enter
+Cancel: Esc
+
+Game still needs to be reopened between runs, sorry"
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -66,7 +96,7 @@ __meta__ = {
 margin_left = 541.0
 margin_top = 165.0
 margin_right = 766.0
-margin_bottom = 200.0
+margin_bottom = 217.0
 custom_fonts/mono_font = SubResource( 1 )
 text = "Floor #
 Turn: ##"
@@ -116,8 +146,9 @@ __meta__ = {
 margin_left = 540.0
 margin_top = 207.0
 margin_right = 798.0
-margin_bottom = 415.0
+margin_bottom = 446.0
 text = "Inventory
+
 1)
 2)
 3)
@@ -127,11 +158,19 @@ text = "Inventory
 7)
 8)
 9)
-10)
-11)
-12)"
+10)"
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="Line2D4" type="Line2D" parent="."]
+
+[node name="VictoryScreen" type="RichTextLabel" parent="."]
+margin_left = 250.0
+margin_top = 170.0
+margin_right = 550.0
+margin_bottom = 400.0
+bbcode_enabled = true
+__meta__ = {
+"_edit_use_anchors_": false
+}

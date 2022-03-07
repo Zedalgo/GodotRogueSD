@@ -42,6 +42,7 @@ var objects:Array = []
 var room_list:Array = []
 # Booleans
 var died_message:bool = false
+var game_won:bool = false
 var map_generated:bool = false
 var player_turn:bool = true
 var shoot_mode:bool = false
@@ -50,6 +51,7 @@ var inventory_mode:bool = false
 # Integers
 var floor_number:int = 0
 var highscore:int
+var life_support_timer:int = 200
 var score:int = 0
 var slot_number:int = 0 # Used for item selection in use_mode
 var tile_width:int = 16
@@ -75,13 +77,12 @@ func _unhandled_input(Input):
 		
 		$SpaceToGenMap.visible = false
 		map_generated = true
-		text_out("Generating Map...")
+		text_out("WARNING: CATASTROPHIC SYSTEMS FAILURE, EVACUATE THE STATION IMMEDIATELY!")
 		create_entity(-1, -1, _player_scene, "Player", 20, 5, 10, "Player", ["Meat"], 5)
 		player = entities[0]
 		player.view_range = 3
 		player.ranged_attack_cost = 2
 		generate_map()
-		text_out("Map Generated")
 		update_fov(player)
 		# Yellow tile used for shooting
 		aim_tile = _wall_scene.instance()
@@ -90,14 +91,8 @@ func _unhandled_input(Input):
 		aim_tile.visible = false
 		get_parent().add_child(aim_tile)
 	
-	#Normal movement, melee attacking
-	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false):
-		if Input.is_action_pressed("debug_key"):
-			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-			create_item(player_index.x, player_index.y, _plus_scene, "debug Debug", 100, 100, ["increase"], Color(0.5, 0.5, 0))
-			astar_debug()
-			for i in range(objects.size()):
-				objects[i].visible = false
+	if (map_generated == true) && (player_turn == true) && (player.alive == true) && (shoot_mode == false) && (inventory_mode == false) && game_won == false:
+		
 		if Input.is_action_pressed("enter"):
 			var new_map:bool = false
 			print(player.position)
@@ -106,9 +101,14 @@ func _unhandled_input(Input):
 					break
 				for j in range(map[i].size()):
 					if map[i][j].terrain_name == "Stairs" && map[i][j].position == player.position:
-						text_out("You descend the ladder to the next floor")
-						new_map = true
-						break
+						life_support_timer += 135
+						
+						if floor_number < 20:
+							text_out("You descend the ladder to the next floor")
+							new_map = true
+							break
+						else:
+							win_game()
 			if new_map == true:
 				generate_map()
 		if Input.is_action_pressed("move_down"):
@@ -122,17 +122,28 @@ func _unhandled_input(Input):
 		if Input.is_action_pressed("get"):
 			var item_found:bool = false
 			var item_index:int
+			var is_corpse:bool = false
 			for i in range(items.size() - 1, -1, -1):
 				if (items[i].position == player.position):
 					item_found = true
 					item_index = i
-			if item_found == true && inventory.size() < 12:
+					for j in range(items[i].item_tags.size()):
+						if items[i].item_tags[j] == "Meat" || items[i].item_tags[j] == "Tech":
+							is_corpse = true
+							use_item(items[i], player)
+							get_parent().remove_child(items[i])
+							items.remove(i)
+							player_turn = false
+							break
+					break
+			
+			if item_found == true && inventory.size() < 10 && is_corpse == false:
 				inventory.append(items[item_index])
 				text_out("You picked up the %s" % items[item_index].item_name)
 				get_parent().remove_child(items[item_index])
 				items.remove(item_index)
 				player_turn = false
-			elif item_found == true && inventory.size() > 11:
+			elif item_found == true && inventory.size() > 9 && is_corpse == false:
 				text_out("You can't carry any more!")
 			elif item_found == false:
 				text_out("There's nothing there")
@@ -141,9 +152,58 @@ func _unhandled_input(Input):
 			aim_tile.position = player.position
 			aim_tile.visible = true
 		
-		if Input.is_action_pressed("open_inventory"):
-			slot_number = 0
-			inventory_mode = true
+		# Number keys to use inventory
+		if Input.is_action_pressed("1"):
+			if inventory.size() > 0:
+				use_item(inventory[0], player)
+				inventory.remove(0)
+				end_player_turn()
+		if Input.is_action_pressed("2"):
+			if inventory.size() > 1:
+				use_item(inventory[1], player)
+				inventory.remove(1)
+				end_player_turn()
+		if Input.is_action_pressed("3"):
+			if inventory.size() > 2:
+				use_item(inventory[2], player)
+				inventory.remove(2)
+				end_player_turn()
+		if Input.is_action_pressed("4"):
+			if inventory.size() > 3:
+				use_item(inventory[3], player)
+				inventory.remove(3)
+				end_player_turn()
+		if Input.is_action_pressed("5"):
+			if inventory.size() > 4:
+				use_item(inventory[4], player)
+				inventory.remove(4)
+				end_player_turn()
+		if Input.is_action_pressed("6"):
+			if inventory.size() > 5:
+				use_item(inventory[5], player)
+				inventory.remove(5)
+				end_player_turn()
+		if Input.is_action_pressed("7"):
+			if inventory.size() > 6:
+				use_item(inventory[6], player)
+				inventory.remove(6)
+				end_player_turn()
+		if Input.is_action_pressed("8"):
+			if inventory.size() > 7:
+				use_item(inventory[7], player)
+				inventory.remove(7)
+				end_player_turn()
+		if Input.is_action_pressed("9"):
+			if inventory.size() > 8:
+				use_item(inventory[8], player)
+				inventory.remove(8)
+				end_player_turn()
+		if Input.is_action_pressed("0"):
+			if inventory.size() > 9:
+				use_item(inventory[9], player)
+				inventory.remove(9)
+				end_player_turn()
+		
 	
 		if player_turn == false:
 			end_player_turn()
@@ -173,44 +233,6 @@ func _unhandled_input(Input):
 				end_player_turn()
 			else:
 				text_out("Not enough energy!")
-	
-	# Using inventory items
-	if inventory_mode == true:
-		if inventory.size() > 0:
-			update_inventory_panel(slot_number)
-			if Input.is_action_pressed("move_up"):
-				if slot_number > 0:
-					slot_number -= 1
-					update_inventory_panel(slot_number)
-				else:
-					slot_number = inventory.size() - 1
-					update_inventory_panel(slot_number)
-			if Input.is_action_pressed("move_down"):
-				if slot_number < inventory.size() - 1:
-					slot_number += 1
-					update_inventory_panel(slot_number)
-				else:
-					slot_number = 0
-					update_inventory_panel(slot_number)
-			if Input.is_action_pressed("enter"):
-				if slot_number < inventory.size():
-					use_item(inventory[slot_number], player)
-					inventory.remove(slot_number)
-					inventory_mode = false
-					end_player_turn()
-			if Input.is_action_pressed("drop"):
-				var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-				create_item(player_index.x, player_index.y, inventory[slot_number].image_scene, inventory[slot_number].item_name,
-						inventory[slot_number].health, inventory[slot_number].energy, inventory[slot_number].item_tags, inventory[slot_number].image_color)
-				inventory.remove(slot_number)
-				inventory_mode = false
-				end_player_turn()
-			if Input.is_action_pressed("cancel"):
-				inventory_mode = false
-				update_inventory_panel(-1)
-		else:
-			text_out("There is nothing in your inventory.")
-			inventory_mode = false
 
 
 func generate_map():
@@ -604,10 +626,28 @@ func generate_map():
 	
 	replace_terrain(stairs_index.x, stairs_index.y, _stairs_scene, "Stairs", true, false)
 	
+	#Prevents overlapping enemies, clears starting room
+	for i in range(entities.size() - 1, -1, -1):
+		for j in range(entities.size() - 1, -1, -1):
+			if entities[j].position == entities[i].position && entities[j] != entities[i]:
+				get_parent().remove_child(entities[j])
+				entities.remove(j)
+				break
+		if entities.size() < i:
+			if (entities[i].position.x > player.position.x - tile_width - 1 && entities[i].position.x < player.position.x + tile_width + 1 &&
+					entities[i].position.y > player.position.y - tile_height - 1 && entities[i].position.y < player.position.y + tile_height + 1 &&
+					entities[i] != player):
+				get_parent().remove_child(entities[i])
+				entities.remove(i)
+	
 	for i in range(map.size()):
 		for j in range(map[i].size()):
 			map[i][j].visible = false
 	for i in range(entities.size() - 1, 1, 1):
+		for j in range(entities.size() -1, -1, -1):
+			if entities[i].position == entities[j].position && entities[i] != entities[j] && entities[j] != player:
+				get_parent().remove_child(entities[j])
+				entities.remove(j)
 		entities[i].visible = false
 	
 	# Initial appearance of the info panels 
@@ -701,10 +741,14 @@ func try_object(object):
 			object.active = false
 			object.modulate = Color(0.25, 0.25, 0.25)
 			update_status_screen()
+			if player_turn == true:
+				player_turn = false
 		else:
 			text_out("The charging station refills your energy.")
 			player.energy_current = player.energy_max
 			update_status_screen()
+			if player_turn == true:
+				player_turn = false
 
 
 func use_item(item, entity):
@@ -734,16 +778,16 @@ func use_item(item, entity):
 			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
 			if random_chance == 0:
 				text_out("As you pull apart the viscera, a warm lump falls from the corpse's innards.")
-				create_item(player_index.x, player_index.y, _o_scene, "Mutagenic Essence", 2, 0, ["increase", "damage_buff"], Color(0.7, 0, 0))
+				create_item(player_index.x, player_index.y, _o_scene, "Stable Mutagen", 2, 0, ["increase", "damage_buff"], Color(0.7, 0, 0))
 			elif random_chance > 0 && random_chance < 6:
 				text_out("As you dig through the viscera, a small lump falls from the corpse's innards.")
-				create_item(player_index.x, player_index.y, _o_scene, "Vital Essence", 2, 0, ["increase"], Color(1, 0, 0))
+				create_item(player_index.x, player_index.y, _o_scene, "Semi-Stable Mutagen", 2, 0, ["increase"], Color(1, 0, 0))
 			else:
 				text_out("You find nothing useful on the corpse.")
 		if item.item_tags[i] == "Tech":
 			var random_chance:int = randi() % 10
 			var player_index:Vector2 = _new_GetCoord.vector_to_index(player.position.x, player.position.y)
-			if random_chance < 1:
+			if random_chance == 0:
 				text_out("As you pull an actuator from its socket, something clatters to the floor.")
 				create_item(player_index.x, player_index.y, _o_scene, "Small Capacitor", 0, 1, ["increase"], Color(0.5, 0.5, 1))
 			elif random_chance < 4:
@@ -792,16 +836,21 @@ func update_status_screen():
 
 
 func update_inventory_panel(inventory_slot_num):
-	$InventoryScreen.text = "Inventory:\n"
-	var empty_slot_number:int = 12 - inventory.size()
+	$InventoryScreen.text = "Inventory:\n\n"
+	var empty_slot_number:int = 10 - inventory.size()
+	var slot_number:int
 	for i in range(inventory.size()):
-		if inventory_slot_num == i:
-			$InventoryScreen.push_color(inventory[i].modulate)
-			$InventoryScreen.text = "%s>%s) %s<\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
+		if i == 9:
+			slot_number = 0
 		else:
-			$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, i + 1, inventory[i].item_name]
+			slot_number = i + 1
+		$InventoryScreen.text = "%s%s) %s\n" % [$InventoryScreen.text, slot_number, inventory[i].item_name]
 	for i in range(empty_slot_number):
-		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, (i + inventory.size() + 1)]
+		if (inventory.size() + i + 1) == 10:
+			slot_number = 0
+		else:
+			slot_number = inventory.size() + i + 1
+		$InventoryScreen.text = "%s%s) \n" % [$InventoryScreen.text, slot_number]
 
 # Reveals tiles on player view and dims visited tiles outside it
 # Setting up to be usable for enemy LoS as well, hopefully
@@ -986,11 +1035,48 @@ func end_player_turn():
 	# Heal back 1% health every 10 turns (minimum of 1 health)
 	if (player.health_current < player.health_max) && (turn_number % 10 == 0):
 		player.health_current += round(clamp((player.health_max / 100), 1, 100))
+	
 	update_inventory_panel(-1)
 	update_status_screen()
-	create_corpses()
+	
 	enemy_phase()
 	update_fov(player)
+	
+	if life_support_timer - turn_number == 150:
+		text_out("Warning: Life Support at 75%")
+	elif life_support_timer - turn_number == 100:
+		text_out("Warning: Life Support at 50%")
+	elif life_support_timer - turn_number == 50:
+		text_out("Warning: Life support at 25%")
+	elif life_support_timer - turn_number == 20:
+		text_out("Warning: Life support at 10%")
+	elif life_support_timer - turn_number == 10:
+		text_out("Warning: Life support at 5%")
+	elif life_support_timer - turn_number == 0:
+		text_out("Warning: Life Support at 0%")
+	elif life_support_timer - turn_number == -1:
+		for i in range(map.size()):
+			for j in range(map[i].size()):
+				map[i][j].modulate.a = 0.8
+	elif life_support_timer - turn_number == -2:
+		for i in range(map.size()):
+			for j in range(map[i].size()):
+				map[i][j].modulate.a = 0.6
+	elif life_support_timer - turn_number == -3:
+		for i in range(map.size()):
+			for j in range(map[i].size()):
+				map[i][j].modulate.a = 0.4
+	elif life_support_timer - turn_number == -4:
+		for i in range(map.size()):
+			for j in range(map[i].size()):
+				map[i][j].modulate.a = 0.2
+	elif life_support_timer - turn_number == -5:
+		for i in range(map.size()):
+			for j in range(map[i].size()):
+				map[i][j].modulate.a = 0.2
+				player.alive = false
+	
+	create_corpses()
 	check_player_alive()
 
 
@@ -1020,7 +1106,7 @@ func roll_item(floor_num:int, index_position:Vector2):
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
 					energy = 5
-					item_name = "Small Energy Cell"
+					item_name = "Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0.5, 0.5, 1)
 			if type[0] == "increase":
@@ -1042,8 +1128,8 @@ func roll_item(floor_num:int, index_position:Vector2):
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
-					energy = 10
-					item_name = "Medium Energy Cell"
+					energy = 5
+					item_name = "Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0.5, 0.5, 1)
 			if type[0] == "increase":
@@ -1065,8 +1151,8 @@ func roll_item(floor_num:int, index_position:Vector2):
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
-					energy = 15
-					item_name = "Large Energy Cell"
+					energy = 5
+					item_name = "Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0.5, 0.5, 1)
 			if type[0] == "increase":
@@ -1094,8 +1180,8 @@ func roll_item(floor_num:int, index_position:Vector2):
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
-					energy = 25
-					item_name = "Massive Energy Cell"
+					energy = 5
+					item_name = "Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0, 1, 1)
 			if type[0] == "increase":
@@ -1116,16 +1202,18 @@ func roll_item(floor_num:int, index_position:Vector2):
 						item_name = "Unstable Capacitor"
 						item_scene = _o_scene
 						item_color = Color(0.75, 0.75, 1)
-		21, 22:
+		21:
+			pass
+		22:
 			if type[0] == "restore":
 				if coin_toss == 0:
-					health = 100
-					item_name = "Regenerative Nanobot Capsule"
+					health = 32
+					item_name = "Hi-Potency Capsule"
 					item_scene = _plus_scene
 					item_color = Color(1, 0, 0)
 				elif coin_toss == 1:
-					energy = 100
-					item_name = "Single-Burn Energy Cell"
+					energy = 10
+					item_name = "Large Energy Cell"
 					item_scene = _o_scene
 					item_color = Color(0, 1, 1)
 			if type[0] == "increase":
@@ -1143,13 +1231,14 @@ func roll_item(floor_num:int, index_position:Vector2):
 						if energy > -1:
 							type.append("ranged_buff")
 							type.append("ranged_buff")
-						item_name = "Stabilized Experimental Capacitor"
+						item_name = "Stable Experimental Capacitor"
 						item_scene = _o_scene
 						item_color = Color(0.75, 0.75, 1)
 		23, 24:
 			pass
 	
-	create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, type, item_color)
+	if item_name != "AnErrorHasOccurred":
+		create_item(index_position.x, index_position.y, item_scene, item_name, health, energy, type, item_color)
 
 # Number range is min:0, max:24
 func roll_enemy(floor_num:int, index_position:Vector2):
@@ -1245,7 +1334,33 @@ func check_player_alive():
 
 
 func win_game():
-	pass
+	$Line2D.visible = false
+	$Line2D2.visible = false
+	$Line2D3.visible = false
+	$Line2D4.visible = false
+	$Text_Log.visible = false
+	$Text_Log2.visible = false
+	$StatusScreen.visible = false
+	$TurnTracker.visible = false
+	$StatusNumbers.visible = false
+	$HealthBar.visible = false
+	$EnergyBar.visible = false
+	$InventoryScreen.visible = false
+	$VictoryScreen.bbcode_text = "[center]You Win!\n\nScore: %s\n\n" % score
+	for i in range(map.size()):
+		for j in range(map[i].size()):
+			map[i][j].visible = false
+	for i in range(entities.size()):
+		entities[i].visible = false
+	for i in range(items.size()):
+		items[i].visible = false
+	for i in range(objects.size()):
+		objects[i].visible = false
+	
+	if score > highscore:
+		$VictoryScreen.bbcode_text = ("%s[center]!!New Highscore!!") % $VictoryScreen.bbcode_text
+		highscore = score
+		save_highscore()
 
 
 func astar_debug():
