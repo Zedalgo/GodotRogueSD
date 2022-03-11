@@ -80,7 +80,7 @@ func _unhandled_input(Input):
 		text_out("WARNING: CATASTROPHIC SYSTEMS FAILURE, EVACUATE THE STATION IMMEDIATELY!")
 		create_entity(-1, -1, _player_scene, "Player", 20, 5, 10, "Player", ["Meat"], 5)
 		player = entities[0]
-		player.view_range = 3
+		player.view_range = 5
 		player.ranged_attack_cost = 2
 		generate_map()
 		update_fov(player)
@@ -101,7 +101,7 @@ func _unhandled_input(Input):
 					break
 				for j in range(map[i].size()):
 					if map[i][j].terrain_name == "Stairs" && map[i][j].position == player.position:
-						life_support_timer += 135
+						life_support_timer += 145
 						
 						if floor_number < 20:
 							text_out("You descend the ladder to the next floor")
