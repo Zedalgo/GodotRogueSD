@@ -70,6 +70,34 @@ func _ready():
 
 # Handles player inputs
 func _unhandled_input(Input):
+	if Input.is_action_pressed("Reset Run"):
+		for i in range(entities.size()-1, -1, -1):
+			get_parent().remove_child(entities[i])
+			entities.remove(i)
+		print(entities)
+		for i in range(items.size()-1, -1, -1):
+			get_parent().remove_child(items[i])
+			items.remove(i)
+		print(items)
+		for i in range(objects.size()-1, -1, -1):
+			get_parent().remove_child(objects[i])
+			objects.remove(i)
+		print(objects)
+		for i in range(inventory.size()-1, -1, -1):
+			inventory.remove(i)
+		score = 0
+		for i in range(map.size()-1, -1, -1):
+			for j in range(map[i].size()-1, -1, -1):
+				get_parent().remove_child(map[i][j])
+				map[i].remove(j)
+			map.remove(i)
+			map_generated = false
+			$SpaceToGenMap.visible = true
+			floor_number = 0
+			turn_number = 0
+			$Text_Log.text = ""
+			astar.clear()
+	
 	# Handles start screen input (space to start)
 	if Input.is_action_pressed("start_game") && map_generated == false:
 		

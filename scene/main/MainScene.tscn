@@ -65,7 +65,7 @@ Inventory: Number Keys
 Shoot/Use Stairs: Enter
 Cancel: Esc
 
-Game still needs to be reopened between runs, sorry"
+Reset: Backspace"
 text = "Controls:
 
 Move: Arrow Keys
@@ -75,7 +75,7 @@ Aim
 Shoot/Use Stairs: Enter
 Cancel: Esc
 
-Game still needs to be reopened between runs, sorry"
+Reset: Backspace"
 __meta__ = {
 "_edit_use_anchors_": false
 }
